@@ -9,7 +9,13 @@ from . import models
 from ._version import __version__
 from .async_client import AsyncShop
 from .client import Shop
-from .results import Completed, ConfirmationRequired, PendingApproval, WriteResult
+from .results import (
+    AsyncConfirmationRequired,
+    Completed,
+    ConfirmationRequired,
+    PendingApproval,
+    WriteResult,
+)
 from .webhooks import WebhookEvent, WebhookVerificationError, verify_webhook
 from .errors import (
     ApprovalRequiredError,
@@ -37,6 +43,7 @@ __all__ = [
     "WriteResult",
     "Completed",
     "ConfirmationRequired",
+    "AsyncConfirmationRequired",
     "PendingApproval",
     "ShopError",
     "AuthenticationError",

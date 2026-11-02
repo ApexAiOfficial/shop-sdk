@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "ApprovalInfo",
@@ -363,8 +363,9 @@ class SalesSummary(_Model):
 
 
 class ConfirmationInfo(_Model):
-    id: str
-    """Single use; pass it back as ``confirmation`` once the user agrees."""
+    id: str = Field(repr=False)
+    """Single use; pass it back as ``confirmation`` once the user agrees. Never
+    shown by ``repr()``: whoever holds it and the token can confirm the change."""
     expires_at: datetime
 
 

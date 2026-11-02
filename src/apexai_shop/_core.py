@@ -7,7 +7,7 @@ import re
 import secrets
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, Union
 from urllib.parse import quote
 
 import httpx
@@ -31,7 +31,7 @@ from .errors import (
     StoreSuspendedError,
     WritesDisabledError,
 )
-from .models import WriteAnswer
+from .models import ConfirmationInfo, WriteAnswer
 from .results import Completed, Confirm, ConfirmationRequired, PendingApproval, WriteResult
 
 ENV_BASE_URL = "SHOP_API_URL"
@@ -50,6 +50,16 @@ IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 WRITE_RETRY_CODES_409 = frozenset({"idempotency_in_progress"})
 #: 429 codes a write never retries: waiting seconds does not help.
 WRITE_FINAL_CODES_429 = frozenset({"daily_cap"})
+#: Transport errors raised before a request could reach the server.
+NOT_SENT_ERRORS: Tuple[Type[httpx.TransportError], ...] = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+    httpx.ProxyError,
+    httpx.UnsupportedProtocol,
+)
+#: Statuses a gateway answers when the request may have reached the server anyway.
+GATEWAY_STATUSES = frozenset({502, 504})
 
 M = TypeVar("M", bound=BaseModel)
 A = TypeVar("A", bound=WriteAnswer)
@@ -106,8 +116,11 @@ def build_request(
     operation path is appended to it and the ``/api/merchant/v1`` prefix is
     always kept. Path parameters are percent-encoded. ``None`` query values
     and ``None`` body fields are omitted (for a write, ``None`` means "leave
-    as it is"). Reads have no body (``json_body`` is ``None``); a write
-    always sends a JSON object, possibly empty.
+    as it is"; the contract tests check that every nullable body field is
+    optional, so omitting one equals sending null). A ``confirmation`` may be
+    the preview's :class:`ConfirmationInfo` or its id. Reads have no body
+    (``json_body`` is ``None``); a write always sends a JSON object, possibly
+    empty.
     """
     operation = OPERATIONS[operation_id]
     path = operation.path
@@ -127,11 +140,18 @@ def build_request(
         for name, value in (body or {}).items():
             if name not in operation.body:
                 raise TypeError(f"{operation_id} has no body field {name!r}")
+            if isinstance(value, ConfirmationInfo):
+                value = value.id
             if value is not None:
                 json_body[name] = _encode_json(value)
     elif body:
         raise TypeError(f"{operation_id} takes no body")
     return operation.method, base_url + path, params, json_body
+
+
+def confirmable(operation_id: str) -> bool:
+    """Whether the operation takes a ``confirmation`` (a two-step write)."""
+    return "confirmation" in OPERATIONS[operation_id].body
 
 
 def idempotency_key(key: Optional[str] = None) -> str:
@@ -177,6 +197,20 @@ def parse_retry_after(value: Optional[str]) -> Optional[float]:
 
 def backoff(attempt: int) -> float:
     return BACKOFF[min(attempt, len(BACKOFF) - 1)]
+
+
+def may_have_arrived(failure: Union[httpx.TransportError, httpx.Response]) -> bool:
+    """Whether a retried attempt may have reached the server although its answer was lost.
+
+    True for a transport error after the connection was made (a read timeout,
+    a reset), a 502 or 504 from a gateway, and 409 ``idempotency_in_progress``
+    (an earlier attempt with the same key is still running).
+    """
+    if isinstance(failure, httpx.TransportError):
+        return not isinstance(failure, NOT_SENT_ERRORS)
+    if failure.status_code in GATEWAY_STATUSES:
+        return True
+    return failure.status_code == 409 and _error_code(failure) in WRITE_RETRY_CODES_409
 
 
 def _error_code(response: httpx.Response) -> Optional[str]:
@@ -251,14 +285,28 @@ def _str_list(value: Any) -> List[str]:
     return [str(v) for v in value] if isinstance(value, list) else []
 
 
+#: Added to a 409 ``confirmation_invalid`` that follows an attempt whose answer was lost.
+LOST_ANSWER_NOTE = (
+    "An earlier attempt of this call got no answer: it may have found that the effect "
+    "changed, which spends the confirmation (had it made the change, the API would have "
+    "answered the stored result). This call changed nothing: call the operation again "
+    "without a confirmation for a new preview, and show the user its effect."
+)
+
+
 def error_from_response(
     response: httpx.Response,
     bind_preview: Optional[Callable[[Dict[str, Any]], Optional[ConfirmationRequired[Any]]]] = None,
+    *,
+    answer_lost: bool = False,
 ) -> ShopError:
     """The :class:`ShopError` subclass for an error ``response``.
 
     ``bind_preview`` turns the fresh preview of a 409 ``changed`` into a
     :class:`ConfirmationRequired` bound to the write that got it.
+    ``answer_lost``: an earlier attempt of the same call may have reached the
+    server (see :func:`may_have_arrived`), which explains a
+    ``confirmation_invalid`` on a retry.
     """
     status = response.status_code
     body: Any
@@ -303,6 +351,8 @@ def error_from_response(
                 bound = bind_preview(preview)
             return ChangedError(status, code, message, request_id, preview=bound)
         if code == "confirmation_invalid":
+            if answer_lost:
+                message = f"{message} {LOST_ANSWER_NOTE}"
             return ConfirmationInvalidError(status, code, message, request_id)
         current = body.get("current")
         return ConflictError(
@@ -354,6 +404,12 @@ _RESULT_CLASSES = {
 }
 
 
+def _types_result(answer: WriteAnswer) -> bool:
+    """Whether the operation's answer model types ``result`` (so ``done`` carries one)."""
+    field = type(answer).model_fields.get("result")
+    return field is not None and field.annotation not in (None, type(None))
+
+
 def write_result(
     answer: WriteAnswer,
     *,
@@ -361,16 +417,36 @@ def write_result(
     status: Optional[int] = None,
     request_id: Optional[str] = None,
     replayed: bool = False,
+    preview_class: Type[ConfirmationRequired[Any]] = ConfirmationRequired,
 ) -> WriteResult[Any]:
     """Wrap a parsed envelope in :class:`Completed`, :class:`ConfirmationRequired`
-    or :class:`PendingApproval` (a plain :class:`WriteResult` for a status this
-    client does not know). ``status`` and ``request_id`` only label an error."""
-    cls = _RESULT_CLASSES.get(answer.status, WriteResult)
+    (``preview_class``) or :class:`PendingApproval` (a plain :class:`WriteResult`
+    for a status this client does not know). ``status`` and ``request_id`` only
+    label an error.
+
+    A preview without its ``confirmation`` or ``effect``, an approval without
+    ``approval``, and ``done`` without the ``result`` its operation returns are
+    ``invalid_response`` errors, so those fields are never ``None`` on the
+    typed results.
+    """
+    cls: Type[WriteResult[Any]] = _RESULT_CLASSES.get(answer.status, WriteResult)
     missing = None
-    if cls is ConfirmationRequired and answer.confirmation is None:
-        missing = "confirmation"
+    if cls is ConfirmationRequired:
+        cls = preview_class
+        if answer.confirmation is None:
+            missing = "confirmation"
+        elif answer.effect is None:
+            missing = "effect"
     elif cls is PendingApproval and answer.approval is None:
         missing = "approval"
+    elif cls is Completed and answer.result is None and _types_result(answer):
+        raise ShopError(
+            status,
+            "invalid_response",
+            "The API answered done without result: the change was made, but this client "
+            "cannot show it.",
+            request_id,
+        )
     if missing is not None:
         raise ShopError(
             status,
@@ -382,7 +458,11 @@ def write_result(
 
 
 def parse_write(
-    response: httpx.Response, model: Type[A], confirm: Optional[Confirm] = None
+    response: httpx.Response,
+    model: Type[A],
+    confirm: Optional[Confirm] = None,
+    *,
+    preview_class: Type[ConfirmationRequired[Any]] = ConfirmationRequired,
 ) -> WriteResult[Any]:
     """A write's successful (200 or 202) ``response`` as a typed result."""
     answer = parse_response(response, model)
@@ -393,11 +473,15 @@ def parse_write(
         status=response.status_code,
         request_id=response.headers.get("x-request-id"),
         replayed=replayed,
+        preview_class=preview_class,
     )
 
 
 def preview_binder(
-    model: Type[A], confirm: Confirm
+    model: Type[A],
+    confirm: Confirm,
+    *,
+    preview_class: Type[ConfirmationRequired[Any]] = ConfirmationRequired,
 ) -> Callable[[Dict[str, Any]], Optional[ConfirmationRequired[Any]]]:
     """For :func:`error_from_response`: a 409 ``changed`` preview as a bound
     :class:`ConfirmationRequired`, or ``None`` if it is not one."""
@@ -405,12 +489,22 @@ def preview_binder(
     def bind(preview: Dict[str, Any]) -> Optional[ConfirmationRequired[Any]]:
         try:
             answer = model.model_validate(preview)
-            result = write_result(answer, confirm=confirm)
+            result = write_result(answer, confirm=confirm, preview_class=preview_class)
         except (ValidationError, ShopError):
             return None
         return result if isinstance(result, ConfirmationRequired) else None
 
     return bind
+
+
+def not_confirmable() -> ShopError:
+    """What ``confirm()`` raises on a preview from an operation that takes no confirmation."""
+    return ShopError(
+        None,
+        "invalid_response",
+        "The API asked to confirm a change this client cannot confirm: the operation takes no "
+        "confirmation in this contract version. Nothing was changed.",
+    )
 
 
 def connection_message(exc: Exception) -> str:

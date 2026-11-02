@@ -10,6 +10,12 @@ Refused writes add a few classes keyed on their stable codes:
 :class:`ConfirmationInvalidError`), :class:`StoreSuspendedError` (423),
 :class:`DailyCapError` (429 ``daily_cap``), :class:`ApprovalRequiredError` and
 :class:`WritesDisabledError` (403).
+
+Every error a write raises carries that call's ``idempotency_key``. A
+:class:`ConnectionError`, a :class:`ServerError` or an ``invalid_response``
+does not say whether the change was made: repeat the same call with
+``idempotency_key=err.idempotency_key`` and the API answers the stored result
+if it was, or makes the change once if it was not.
 """
 
 from __future__ import annotations
@@ -39,7 +45,13 @@ __all__ = [
 
 
 class ShopError(Exception):
-    """Base class for every error raised by the client."""
+    """Base class for every error raised by the client.
+
+    ``idempotency_key`` is the ``Idempotency-Key`` the failed write sent
+    (``None`` for reads): pass it to the same call to retry it safely.
+    """
+
+    idempotency_key: Optional[str] = None
 
     def __init__(
         self,
@@ -81,10 +93,12 @@ class PermissionDeniedError(ShopError):
 
 
 class ApprovalRequiredError(PermissionDeniedError):
-    """403 ``approval_required``: this change needs the store owner's approval in Telegram.
+    """403 ``approval_required``: refused, because this change needs the store owner's approval.
 
-    ``reasons`` lists why, in the server's words. Until the API takes such
-    approvals itself, ask the store owner to make the change in the bot.
+    Nothing was changed and nothing was queued. ``reasons`` lists why, in the
+    server's words: ask the store owner to make the change in the bot. (A
+    :class:`~apexai_shop.PendingApproval` result is different: the change was
+    queued and waits for the owner to tap Approve in Telegram.)
     """
 
     def __init__(
@@ -143,8 +157,9 @@ class ConflictError(ShopError):
 
     For code ``conflict`` (an edit based on an outdated version), ``current``
     holds the object as it is now, so you can show it and try again. Other
-    409 codes (``already_exists``, ``idempotency_in_progress``, ...) raise
-    this class too, with ``current`` set to ``None``.
+    409 codes (``idempotency_in_progress`` once the client's retries are
+    spent, and codes newer than this client) raise this class too, with
+    ``current`` set to ``None``.
     """
 
     def __init__(
@@ -183,7 +198,8 @@ class ChangedError(ConflictError):
 class ConfirmationInvalidError(ConflictError):
     """409 ``confirmation_invalid``: the confirmation is unknown, expired, used, or for other arguments.
 
-    Call the operation again without a confirmation for a new preview.
+    This call changed nothing. Call the operation again without a
+    confirmation for a new preview, and show the user its effect.
     """
 
 

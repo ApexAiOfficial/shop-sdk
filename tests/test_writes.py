@@ -10,6 +10,7 @@ import httpx
 import pytest
 
 from apexai_shop import (
+    AsyncConfirmationRequired,
     ApprovalRequiredError,
     BadRequestError,
     ChangedError,
@@ -30,7 +31,7 @@ from apexai_shop import (
     WritesDisabledError,
     models,
 )
-from apexai_shop._core import build_request
+from apexai_shop._core import LOST_ANSWER_NOTE, build_request
 from conftest import (
     BASE_URL,
     CATEGORY,
@@ -256,6 +257,8 @@ def test_idempotency_in_progress_exhausted_raises_conflict():
         shop.categories.create("Guides")
     assert info.value.code == "idempotency_in_progress"
     assert len(rec.requests) == 3
+    assert sleeps == [2.0, 2.0]
+    assert len({r.headers["idempotency-key"] for r in rec.requests}) == 1
 
 
 def test_daily_cap_is_never_retried():
@@ -295,6 +298,26 @@ def test_write_is_not_retried_when_retry_after_exceeds_the_cap():
     assert sleeps == []
 
 
+@pytest.mark.parametrize(
+    "status,code,cls",
+    [(409, "idempotency_in_progress", ConflictError), (503, "busy", ServerError)],
+)
+def test_write_retry_after_over_the_cap_is_final(status, code, cls):
+    shop, rec, sleeps = make_shop(_sequence(_error(status, code, {"Retry-After": "300"}), _done()))
+    with pytest.raises(cls) as info:
+        shop.categories.create("Guides")
+    assert info.value.code == code
+    assert len(rec.requests) == 1
+    assert sleeps == []
+
+
+def test_write_rate_limit_without_retry_after_backs_off():
+    shop, rec, sleeps = make_shop(_sequence(_error(429, "rate_limited"), _error(429, "rate_limited"), _done()))
+    assert isinstance(shop.categories.create("Guides"), Completed)
+    assert sleeps == [0.5, 1.0]
+    assert len({r.headers["idempotency-key"] for r in rec.requests}) == 1
+
+
 def test_gateway_errors_on_writes_back_off():
     shop, rec, sleeps = make_shop(_sequence(httpx.Response(502), httpx.Response(504), _done()))
     assert isinstance(shop.categories.create("Guides"), Completed)
@@ -313,7 +336,14 @@ def test_busy_exhausted_raises_server_error():
 
 @pytest.mark.parametrize(
     "status,code",
-    [(409, "conflict"), (409, "changed"), (409, "already_exists"), (423, "store_suspended"), (500, "internal_error")],
+    [
+        (409, "conflict"),
+        (409, "changed"),
+        (409, "confirmation_invalid"),
+        (409, "a_code_newer_than_this_client"),
+        (423, "store_suspended"),
+        (500, "internal_error"),
+    ],
 )
 def test_final_write_errors_are_not_retried(status, code):
     shop, rec, sleeps = make_shop(_sequence(_error(status, code, {"Retry-After": "1"}), _done()))
@@ -353,7 +383,10 @@ def test_confirmation_round_trip():
     assert first.confirmation.id == "conf_abc123"
     assert first.confirmation.expires_at.isoformat() == "2026-11-02T12:05:00+00:00"
     assert first.next.startswith("Show the user")
-    assert "conf_abc123" not in repr(first)
+    for text in (repr(first), repr(first.confirmation), repr(vars(first)), repr(first.answer)):
+        assert "conf_abc123" not in text
+    # The envelope's dump is data, for logging on purpose or returning to an agent: it has the id.
+    assert first.answer.model_dump(mode="json")["confirmation"]["id"] == "conf_abc123"
 
     done = first.confirm()
     assert isinstance(done, Completed)
@@ -386,9 +419,88 @@ def test_confirm_on_a_write_without_a_confirmation_field_is_refused():
     # update_category takes no confirmation in the contract: nothing is sent.
     first = shop.categories.update(1, title="Handbooks", active=False)
     assert isinstance(first, ConfirmationRequired)
-    with pytest.raises(TypeError, match="no body field 'confirmation'"):
+    with pytest.raises(ShopError) as info:
         first.confirm()
+    assert info.value.code == "invalid_response"
+    assert "cannot confirm" in info.value.message
+    assert "update_category" not in str(info.value)
     assert len(rec.requests) == 1
+
+
+def test_changed_preview_of_a_write_without_a_confirmation_field_cannot_confirm():
+    """The shared 409 description lists ``changed`` for every write; only two-step writes can confirm."""
+    shop, rec, _ = make_shop(lambda request: _error(409, "changed", preview=preview()))
+    with pytest.raises(ChangedError) as info:
+        shop.categories.update(1, title="x")
+    assert isinstance(info.value.preview, ConfirmationRequired)
+    with pytest.raises(ShopError) as refused:
+        info.value.preview.confirm()
+    assert refused.value.code == "invalid_response"
+    assert len(rec.requests) == 1
+
+
+def test_delete_accepts_the_confirmation_object():
+    shop, rec, _ = make_shop(_confirm_flow(httpx.Response(202, json=preview()), _done("delete_category")))
+    first = shop.categories.delete(1)
+    done = shop.categories.delete(1, confirmation=first.confirmation)
+    assert isinstance(done, Completed)
+    assert _body(rec.requests[1]) == {"confirmation": "conf_abc123"}
+
+
+def test_confirm_again_after_a_lost_answer_resends_the_confirmation():
+    """A confirmation that made its change answers the stored result to any later confirm."""
+    replay = answer(result={"deleted": True, "category_id": 1}, replayed=True)
+    shop, rec, _ = make_shop(
+        _confirm_flow(
+            httpx.Response(202, json=preview()),
+            *[httpx.ReadTimeout("lost")] * 3,
+            httpx.Response(200, json=replay, headers={"Idempotent-Replayed": "true"}),
+            httpx.Response(200, json=replay, headers={"Idempotent-Replayed": "true"}),
+        )
+    )
+    first = shop.categories.delete(1)
+    with pytest.raises(ConnectionError) as info:
+        first.confirm()
+    lost_key = info.value.idempotency_key
+    assert [r.headers["idempotency-key"] for r in rec.requests[1:4]] == [lost_key] * 3
+
+    again = first.confirm(idempotency_key=lost_key)
+    assert isinstance(again, Completed) and again.replayed
+    plain = first.confirm()
+    assert isinstance(plain, Completed) and plain.replayed
+    assert rec.requests[4].headers["idempotency-key"] == lost_key
+    assert rec.requests[5].headers["idempotency-key"] != lost_key
+    assert [_body(r) for r in rec.requests[1:]] == [{"confirmation": "conf_abc123"}] * 5
+
+
+@pytest.mark.parametrize(
+    "lost,noted",
+    [
+        (httpx.ReadTimeout("answer lost"), True),
+        (httpx.RemoteProtocolError("reset"), True),
+        (httpx.Response(504), True),
+        (_error(409, "idempotency_in_progress", {"Retry-After": "1"}), True),
+        (httpx.ConnectError("never sent"), False),
+        (_error(503, "busy", {"Retry-After": "1"}), False),
+    ],
+)
+def test_confirmation_invalid_after_a_lost_answer_says_so(lost, noted):
+    shop, rec, _ = make_shop(
+        _confirm_flow(httpx.Response(202, json=preview()), lost, _error(409, "confirmation_invalid"))
+    )
+    first = shop.categories.delete(1)
+    with pytest.raises(ConfirmationInvalidError) as info:
+        first.confirm()
+    assert (LOST_ANSWER_NOTE in info.value.message) is noted
+    assert info.value.message.startswith("Words.")
+    assert len(rec.requests) == 3
+
+
+def test_confirmation_invalid_on_a_first_attempt_has_no_note():
+    shop, _, _ = make_shop(lambda request: _error(409, "confirmation_invalid"))
+    with pytest.raises(ConfirmationInvalidError) as info:
+        shop.categories.delete(1, confirmation="conf_old")
+    assert info.value.message == "Words."
 
 
 def test_changed_raises_with_a_fresh_bound_preview():
@@ -454,6 +566,24 @@ def test_confirmation_required_without_confirmation_is_invalid():
     assert info.value.code == "invalid_response"
 
 
+def test_confirmation_required_without_effect_is_invalid():
+    body = dict(preview(), effect=None)
+    shop, _, _ = make_shop(lambda request: httpx.Response(202, json=body))
+    with pytest.raises(ShopError) as info:
+        shop.categories.delete(1)
+    assert info.value.code == "invalid_response"
+    assert "without effect" in info.value.message
+
+
+def test_done_without_result_is_invalid_and_carries_the_key():
+    shop, rec, _ = make_shop(lambda request: httpx.Response(200, json=answer()))
+    with pytest.raises(ShopError) as info:
+        shop.categories.create("Guides")
+    assert info.value.code == "invalid_response"
+    assert "the change was made" in info.value.message
+    assert info.value.idempotency_key == rec.requests[0].headers["idempotency-key"]
+
+
 def test_unknown_status_is_a_plain_write_result():
     shop, _, _ = make_shop(lambda request: httpx.Response(202, json=answer("queued")))
     result = shop.categories.create("Guides")
@@ -474,14 +604,17 @@ def test_unknown_status_is_a_plain_write_result():
         (403, "approval_required", ApprovalRequiredError),
         (404, "not_found", NotFoundError),
         (409, "conflict", ConflictError),
-        (409, "already_exists", ConflictError),
+        (409, "idempotency_in_progress", ConflictError),
         (409, "confirmation_invalid", ConfirmationInvalidError),
         (409, "changed", ChangedError),
         (422, "idempotency_key_reused", BadRequestError),
         (423, "store_suspended", StoreSuspendedError),
-        (423, "something_new", StoreSuspendedError),
+        (429, "rate_limited", RateLimitError),
         (429, "daily_cap", DailyCapError),
-        (503, "telegram_unavailable", ServerError),
+        (503, "busy", ServerError),
+        # Codes newer than this client map by status.
+        (409, "a_code_newer_than_this_client", ConflictError),
+        (423, "a_code_newer_than_this_client", StoreSuspendedError),
     ],
 )
 def test_write_error_mapping(status, code, cls):
@@ -509,7 +642,7 @@ def test_conflict_carries_current():
 
 
 def test_other_conflicts_have_no_current():
-    shop, _, _ = make_shop(lambda request: _error(409, "already_exists"))
+    shop, _, _ = make_shop(lambda request: _error(409, "a_code_newer_than_this_client"))
     with pytest.raises(ConflictError) as info:
         shop.categories.create("Guides")
     assert info.value.current is None
@@ -539,13 +672,77 @@ def test_422_write_fields():
     assert info.value.fields == ["title"]
 
 
-def test_token_never_in_write_results_or_errors():
-    shop, _, _ = make_shop(_sequence(httpx.Response(202, json=preview()), _error(409, "changed", preview=preview())))
+def test_token_and_confirmation_ids_never_in_write_results_or_errors():
+    fresh = preview(confirmation_id="conf_fresh456")
+    shop, _, _ = make_shop(_sequence(httpx.Response(202, json=preview()), _error(409, "changed", preview=fresh)))
     first = shop.categories.delete(1)
     with pytest.raises(ChangedError) as info:
         first.confirm()
-    for text in (repr(first), str(info.value), repr(info.value), repr(info.value.preview)):
+    err = info.value
+    texts = (
+        repr(first),
+        repr(first.confirmation),
+        str(err),
+        repr(err),
+        repr(err.preview),
+        repr(err.preview.confirmation),
+        repr(vars(err.preview)),
+    )
+    for text in texts:
         assert TOKEN not in text
+        assert "conf_abc123" not in text and "conf_fresh456" not in text
+
+
+# --- the idempotency key on errors -------------------------------------------
+
+
+def test_connection_error_carries_the_key_and_a_retry_with_it_sends_the_same_header():
+    shop, rec, _ = make_shop(_sequence(*[httpx.ReadTimeout("lost")] * 3, _done()))
+    with pytest.raises(ConnectionError) as info:
+        shop.categories.create("Guides")
+    key = info.value.idempotency_key
+    assert key is not None and KEY_RE.match(key)
+    assert {r.headers["idempotency-key"] for r in rec.requests} == {key}
+
+    result = shop.categories.create("Guides", idempotency_key=key)
+    assert isinstance(result, Completed)
+    assert rec.requests[3].headers["idempotency-key"] == key
+    assert rec.requests[3].content == rec.requests[0].content
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        _error(500, "internal_error"),
+        _error(409, "conflict"),
+        _error(429, "daily_cap", {"Retry-After": "60"}),
+        httpx.Response(200, text="not json"),
+    ],
+)
+def test_every_write_error_carries_the_key(response):
+    shop, rec, _ = make_shop(lambda request: response)
+    with pytest.raises(ShopError) as info:
+        shop.categories.create("Guides", idempotency_key="caller-key-0000001")
+    assert info.value.idempotency_key == "caller-key-0000001"
+    assert "caller-key-0000001" not in repr(info.value)
+
+
+def test_read_errors_have_no_key():
+    shop, _, _ = make_shop(lambda request: _error(404, "not_found"))
+    with pytest.raises(NotFoundError) as info:
+        shop.items.get(1)
+    assert info.value.idempotency_key is None
+
+
+def test_confirm_errors_carry_the_confirming_calls_key():
+    shop, rec, _ = make_shop(
+        _confirm_flow(httpx.Response(202, json=preview()), _error(409, "changed", preview=preview()))
+    )
+    first = shop.categories.delete(1)
+    with pytest.raises(ChangedError) as info:
+        first.confirm(idempotency_key="confirm-key-00000001")
+    assert info.value.idempotency_key == "confirm-key-00000001"
+    assert rec.requests[0].headers["idempotency-key"] != "confirm-key-00000001"
 
 
 # --- async parity ------------------------------------------------------------
@@ -607,10 +804,12 @@ def test_async_confirmation_round_trip_and_changed():
             )
         )
         first = await shop.categories.delete(1)
+        assert isinstance(first, AsyncConfirmationRequired)
         assert isinstance(first, ConfirmationRequired)
         try:
             await first.confirm()
         except ChangedError as exc:
+            assert isinstance(exc.preview, AsyncConfirmationRequired)
             done = await exc.preview.confirm()
         else:  # pragma: no cover
             raise AssertionError("expected ChangedError")
@@ -635,3 +834,43 @@ def test_async_malformed_key_is_refused_before_sending():
         return rec
 
     assert asyncio.run(main()).requests == []
+
+
+def test_async_connection_error_carries_the_key():
+    async def main():
+        shop, rec, _ = make_async_shop(_sequence(*[httpx.ReadTimeout("lost")] * 3, _done()))
+        with pytest.raises(ConnectionError) as info:
+            await shop.categories.create("Guides")
+        key = info.value.idempotency_key
+        result = await shop.categories.create("Guides", idempotency_key=key)
+        return rec, key, result
+
+    rec, key, result = asyncio.run(main())
+    assert isinstance(result, Completed)
+    assert [r.headers["idempotency-key"] for r in rec.requests] == [key] * 4
+
+
+def test_async_lost_answer_note_and_unconfirmable_preview():
+    async def main():
+        shop, rec, _ = make_async_shop(
+            _sequence(
+                httpx.Response(202, json=preview()),
+                httpx.ReadTimeout("lost"),
+                _error(409, "confirmation_invalid"),
+                httpx.Response(202, json=preview()),
+            )
+        )
+        first = await shop.categories.delete(1)
+        with pytest.raises(ConfirmationInvalidError) as info:
+            await first.confirm()
+        update = await shop.categories.update(1, title="x")
+        assert isinstance(update, AsyncConfirmationRequired)
+        with pytest.raises(ShopError) as refused:
+            await update.confirm()
+        return rec, info.value, refused.value
+
+    rec, invalid, refused = asyncio.run(main())
+    assert LOST_ANSWER_NOTE in invalid.message
+    assert invalid.idempotency_key == rec.requests[1].headers["idempotency-key"]
+    assert refused.code == "invalid_response"
+    assert len(rec.requests) == 4

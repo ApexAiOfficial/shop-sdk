@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
-from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Set, Type, TypeVar
+from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Set, Type, TypeVar, Union
 
 import httpx
 from pydantic import BaseModel
 
 from . import _core
-from .errors import ConnectionError
+from .errors import ConnectionError, ShopError
 from .models import (
     Attention,
     Category,
@@ -20,6 +20,7 @@ from .models import (
     CategoryMoveAnswer,
     CategoryMoved,
     CategoryPage,
+    ConfirmationInfo,
     ItemDetail,
     ItemPage,
     ItemSummary,
@@ -34,7 +35,7 @@ from .models import (
     StoreResponse,
     WriteAnswer,
 )
-from .results import WriteResult
+from .results import ConfirmationRequired, WriteResult
 
 __all__ = ["Shop"]
 
@@ -53,6 +54,8 @@ class Shop:
     that stays the same across their retries, so a retry never changes the
     store twice; they are also retried on 409 ``idempotency_in_progress``,
     never on 429 ``daily_cap``, and not when Retry-After exceeds 30 seconds.
+    Every error a write raises carries its ``idempotency_key``, to repeat the
+    same call safely when the error does not say whether the change was made.
 
     Pass ``http_client`` to reuse your own :class:`httpx.Client` (its timeout
     and transport are kept, and :meth:`close` leaves it open).
@@ -137,12 +140,18 @@ class Shop:
         body: Optional[Mapping[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Any]:
-        """One logical write: one ``Idempotency-Key``, reused by every retry."""
+        """One logical write: one ``Idempotency-Key``, reused by every retry.
+
+        Every :class:`ShopError` it raises carries that key as
+        ``idempotency_key``, so the caller can repeat the call safely.
+        """
         key = _core.idempotency_key(idempotency_key)
         fixed_path: Dict[str, Any] = dict(path_params or {})
         fixed_body: Dict[str, Any] = dict(body or {})
 
         def confirm(confirmation: str, confirm_key: Optional[str]) -> WriteResult[Any]:
+            if not _core.confirmable(operation_id):
+                raise _core.not_confirmable()
             return self._write(
                 operation_id,
                 model,
@@ -151,14 +160,19 @@ class Shop:
                 idempotency_key=confirm_key,
             )
 
-        response = self._send(
-            operation_id,
-            path_params=fixed_path,
-            body=fixed_body,
-            idempotency_key=key,
-            bind_preview=_core.preview_binder(model, confirm),
-        )
-        return _core.parse_write(response, model, confirm)
+        bind_preview = _core.preview_binder(model, confirm, preview_class=ConfirmationRequired)
+        try:
+            response = self._send(
+                operation_id,
+                path_params=fixed_path,
+                body=fixed_body,
+                idempotency_key=key,
+                bind_preview=bind_preview,
+            )
+            return _core.parse_write(response, model, confirm, preview_class=ConfirmationRequired)
+        except ShopError as exc:
+            exc.idempotency_key = key
+            raise
 
     def _send(
         self,
@@ -177,6 +191,7 @@ class Shop:
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
         attempt = 0
+        answer_lost = False  # an earlier attempt may have reached the server
         while True:
             try:
                 response = self._client.request(
@@ -184,6 +199,7 @@ class Shop:
                 )
             except httpx.TransportError as exc:
                 if attempt < self._max_retries:
+                    answer_lost = answer_lost or _core.may_have_arrived(exc)
                     self._sleep(_core.backoff(attempt))
                     attempt += 1
                     continue
@@ -192,10 +208,11 @@ class Shop:
                 return response
             delay = _core.retry_delay(response, attempt, write=write)
             if delay is not None and attempt < self._max_retries:
+                answer_lost = answer_lost or _core.may_have_arrived(response)
                 self._sleep(delay)
                 attempt += 1
                 continue
-            raise _core.error_from_response(response, bind_preview)
+            raise _core.error_from_response(response, bind_preview, answer_lost=answer_lost)
 
     def _paginate(
         self, operation_id: str, page_model: Type[Any], query: Mapping[str, Any]
@@ -283,7 +300,7 @@ class Categories(_Resource):
         self,
         category_id: int,
         *,
-        confirmation: Optional[str] = None,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[CategoryDeleted]:
         """Delete an empty category, in two steps.
@@ -291,7 +308,8 @@ class Categories(_Resource):
         Without ``confirmation`` the answer is a
         :class:`~apexai_shop.ConfirmationRequired` preview: show the user its
         ``effect`` and call its ``confirm()`` once they agree (or pass
-        ``confirmation=`` the preview's ``confirmation.id``). Needs ``catalog:write``.
+        ``confirmation=`` the preview's ``confirmation`` or its ``id``). Needs
+        ``catalog:write``.
         """
         return self._shop._write(
             "delete_category",

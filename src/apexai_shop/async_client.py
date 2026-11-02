@@ -15,13 +15,14 @@ from typing import (
     Set,
     Type,
     TypeVar,
+    Union,
 )
 
 import httpx
 from pydantic import BaseModel
 
 from . import _core
-from .errors import ConnectionError
+from .errors import ConnectionError, ShopError
 from .models import (
     Attention,
     Category,
@@ -31,6 +32,7 @@ from .models import (
     CategoryMoveAnswer,
     CategoryMoved,
     CategoryPage,
+    ConfirmationInfo,
     ItemDetail,
     ItemPage,
     ItemSummary,
@@ -45,7 +47,7 @@ from .models import (
     StoreResponse,
     WriteAnswer,
 )
-from .results import WriteResult
+from .results import AsyncConfirmationRequired, WriteResult
 
 __all__ = ["AsyncShop"]
 
@@ -57,8 +59,9 @@ class AsyncShop:
     """Async client for one store's merchant API.
 
     Same arguments and methods as :class:`~apexai_shop.Shop`; methods are
-    coroutines, ``iter`` methods return async iterators, and a preview's
-    ``confirm()`` is awaited::
+    coroutines, ``iter`` methods return async iterators, and a preview is an
+    :class:`~apexai_shop.AsyncConfirmationRequired` whose ``confirm()`` is
+    awaited::
 
         async with AsyncShop() as shop:
             async for order in shop.orders.iter(status="paid"):
@@ -148,12 +151,18 @@ class AsyncShop:
         body: Optional[Mapping[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Any]:
-        """One logical write: one ``Idempotency-Key``, reused by every retry."""
+        """One logical write: one ``Idempotency-Key``, reused by every retry.
+
+        Every :class:`ShopError` it raises carries that key as
+        ``idempotency_key``, so the caller can repeat the call safely.
+        """
         key = _core.idempotency_key(idempotency_key)
         fixed_path: Dict[str, Any] = dict(path_params or {})
         fixed_body: Dict[str, Any] = dict(body or {})
 
         async def confirm(confirmation: str, confirm_key: Optional[str]) -> WriteResult[Any]:
+            if not _core.confirmable(operation_id):
+                raise _core.not_confirmable()
             return await self._write(
                 operation_id,
                 model,
@@ -162,14 +171,20 @@ class AsyncShop:
                 idempotency_key=confirm_key,
             )
 
-        response = await self._send(
-            operation_id,
-            path_params=fixed_path,
-            body=fixed_body,
-            idempotency_key=key,
-            bind_preview=_core.preview_binder(model, confirm),
-        )
-        return _core.parse_write(response, model, confirm)
+        preview_class = AsyncConfirmationRequired
+        bind_preview = _core.preview_binder(model, confirm, preview_class=preview_class)
+        try:
+            response = await self._send(
+                operation_id,
+                path_params=fixed_path,
+                body=fixed_body,
+                idempotency_key=key,
+                bind_preview=bind_preview,
+            )
+            return _core.parse_write(response, model, confirm, preview_class=preview_class)
+        except ShopError as exc:
+            exc.idempotency_key = key
+            raise
 
     async def _send(
         self,
@@ -188,6 +203,7 @@ class AsyncShop:
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
         attempt = 0
+        answer_lost = False  # an earlier attempt may have reached the server
         while True:
             try:
                 response = await self._client.request(
@@ -195,6 +211,7 @@ class AsyncShop:
                 )
             except httpx.TransportError as exc:
                 if attempt < self._max_retries:
+                    answer_lost = answer_lost or _core.may_have_arrived(exc)
                     await self._sleep(_core.backoff(attempt))
                     attempt += 1
                     continue
@@ -203,10 +220,11 @@ class AsyncShop:
                 return response
             delay = _core.retry_delay(response, attempt, write=write)
             if delay is not None and attempt < self._max_retries:
+                answer_lost = answer_lost or _core.may_have_arrived(response)
                 await self._sleep(delay)
                 attempt += 1
                 continue
-            raise _core.error_from_response(response, bind_preview)
+            raise _core.error_from_response(response, bind_preview, answer_lost=answer_lost)
 
     async def _paginate(
         self, operation_id: str, page_model: Type[Any], query: Mapping[str, Any]
@@ -286,10 +304,13 @@ class AsyncCategories(_AsyncResource):
         self,
         category_id: int,
         *,
-        confirmation: Optional[str] = None,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[CategoryDeleted]:
-        """Delete an empty category in two steps: a preview, then ``await preview.confirm()``."""
+        """Delete an empty category in two steps: a preview, then ``await preview.confirm()``.
+
+        Or pass ``confirmation=`` the preview's ``confirmation`` (or its ``id``).
+        """
         return await self._shop._write(
             "delete_category",
             CategoryDeleteAnswer,

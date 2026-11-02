@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel
 
 from apexai_shop import models
-from apexai_shop._core import IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN
+from apexai_shop._core import IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN, confirmable
 from apexai_shop._operations import OPERATIONS
 from conftest import SAMPLES
 
@@ -97,6 +97,23 @@ def test_body_fields_match_request_body(contract):
         assert len(table.body) == len(set(table.body))
 
 
+def test_nullable_body_fields_are_optional(contract):
+    """The client omits a ``None`` body field ("leave as it is"), which equals null only
+    when the field is optional. A required nullable field would need an explicit null."""
+    schemas = contract["components"]["schemas"]
+    checked = 0
+    for _, _, op in _operations(contract):
+        name = _body_schema_name(op)
+        if name is None:
+            continue
+        schema = schemas[name]
+        for field, prop in schema["properties"].items():
+            if _nullable(prop):
+                checked += 1
+                assert field not in schema.get("required", []), (op["operationId"], field)
+    assert checked > 0
+
+
 def test_reads_are_gets_and_writes_have_bodies(contract):
     for method, _, op in _operations(contract):
         table = OPERATIONS[op["operationId"]]
@@ -118,10 +135,17 @@ def test_writes_take_the_idempotency_key_header(contract):
 
 
 def test_confirmable_writes_send_confirmation_in_the_body(contract):
-    """Every write that may answer 202 confirmation_required takes ``confirmation``."""
-    for method, _, op in _operations(contract):
-        if "confirmation_required" in op["responses"].get("202", {}).get("description", ""):
-            assert "confirmation" in OPERATIONS[op["operationId"]].body, op["operationId"]
+    """Every two-step write (a ``Confirm`` body, or a 202 preview) takes ``confirmation``,
+    and the client binds ``confirm()`` exactly for those."""
+    two_step = set()
+    for _, _, op in _operations(contract):
+        preview_202 = "confirmation_required" in op["responses"].get("202", {}).get("description", "")
+        if _body_schema_name(op) == "Confirm" or preview_202:
+            two_step.add(op["operationId"])
+    assert two_step, "no two-step write found: the selection matched nothing"
+    for operation_id in two_step:
+        assert "confirmation" in OPERATIONS[operation_id].body, operation_id
+    assert {operation_id for operation_id in OPERATIONS if confirmable(operation_id)} == two_step
 
 
 def test_write_answers_and_errors_are_documented(contract):

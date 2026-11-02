@@ -17,14 +17,18 @@ as a plain :class:`WriteResult`::
 
 With :class:`~apexai_shop.AsyncShop` a preview is an
 :class:`AsyncConfirmationRequired` (also a :class:`ConfirmationRequired`)
-whose ``confirm()`` is awaited.
+whose ``confirm()`` is awaited, and a pending result is an
+:class:`AsyncPendingApproval` whose ``wait()`` is awaited.
 """
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Generic, Optional, TypeVar
+import math
+import time
+from typing import Any, Awaitable, Callable, Generic, Optional, TypeVar, cast
 
-from .models import ApprovalInfo, ConfirmationInfo, Effect, WriteAnswer
+from .errors import ApprovalTimeoutError
+from .models import Approval, ApprovalInfo, ConfirmationInfo, Effect, WriteAnswer
 
 __all__ = [
     "WriteResult",
@@ -32,6 +36,7 @@ __all__ = [
     "ConfirmationRequired",
     "AsyncConfirmationRequired",
     "PendingApproval",
+    "AsyncPendingApproval",
 ]
 
 R = TypeVar("R")
@@ -39,7 +44,19 @@ R = TypeVar("R")
 #: Repeats a write with ``confirmation`` added: ``(confirmation, idempotency_key) -> result``.
 #: For :class:`~apexai_shop.AsyncShop` it returns an awaitable.
 Confirm = Callable[[str, Optional[str]], Any]
+GetApproval = Callable[[int], Approval]
+AsyncGetApproval = Callable[[int], Awaitable[Approval]]
+Sleep = Callable[[float], None]
+AsyncSleep = Callable[[float], Awaitable[None]]
 UNBOUND = "This preview is not bound to a client; pass its confirmation id yourself."
+UNBOUND_APPROVAL = "This pending approval is not bound to a client; call approvals.get() yourself."
+
+
+def _wait_args(timeout: float, poll: float) -> None:
+    if not math.isfinite(timeout) or timeout < 0:
+        raise ValueError("timeout must be a finite number of seconds, 0 or more.")
+    if not math.isfinite(poll) or poll <= 0:
+        raise ValueError("poll must be a finite number of seconds greater than 0.")
 
 
 class WriteResult(Generic[R]):
@@ -77,6 +94,8 @@ class WriteResult(Generic[R]):
         request_id: Optional[str] = None,
         replayed: bool = False,
         confirm: Optional[Confirm] = None,
+        approval_get: Optional[Callable[[int], Any]] = None,
+        sleep: Optional[Callable[[float], Any]] = None,
     ) -> None:
         self.answer = answer
         self.status = answer.status
@@ -89,6 +108,8 @@ class WriteResult(Generic[R]):
         self.next = answer.next
         self.request_id = request_id
         self._confirm = confirm
+        self._approval_get = approval_get
+        self._sleep = sleep
 
     def __repr__(self) -> str:
         parts = [f"status={self.status!r}"]
@@ -179,6 +200,66 @@ class PendingApproval(WriteResult[R]):
 
     approval: ApprovalInfo
 
-    # TODO(get_approval): add ``wait(timeout=..., poll=2.0)`` that polls the
-    # approval until it is decided, once the API serves a read for approvals
-    # (``get_approval``). It is not part of contract version 1 yet.
+    def wait(self, timeout: float = 900.0, poll: float = 2.0) -> Approval:
+        """Poll until the owner decides, or raise :class:`ApprovalTimeoutError`.
+
+        The first read is immediate. Later reads are at least ``poll`` seconds
+        apart and use the originating client's sleep and retry hooks. Rejected,
+        expired, changed and failed approvals are returned for the caller to
+        handle; only an approval that remains pending until ``timeout`` raises.
+        """
+        _wait_args(timeout, poll)
+        getter = cast(Optional[GetApproval], self._approval_get)
+        sleep = cast(Optional[Sleep], self._sleep)
+        if getter is None or sleep is None:
+            raise TypeError(UNBOUND_APPROVAL)
+
+        started = time.monotonic()
+        slept = 0.0
+        while True:
+            approval = getter(self.approval.id)
+            if approval.status != "pending":
+                return approval
+            elapsed = max(time.monotonic() - started, slept)
+            remaining = timeout - elapsed
+            if remaining <= 0:
+                raise ApprovalTimeoutError(self.approval.id, timeout)
+            if remaining < poll:
+                sleep(remaining)
+                raise ApprovalTimeoutError(self.approval.id, timeout)
+            sleep(poll)
+            slept += poll
+            if max(time.monotonic() - started, slept) >= timeout:
+                raise ApprovalTimeoutError(self.approval.id, timeout)
+
+
+class AsyncPendingApproval(PendingApproval[R]):
+    """A pending result from :class:`~apexai_shop.AsyncShop`; await ``wait()``."""
+
+    async def wait(  # type: ignore[override]
+        self, timeout: float = 900.0, poll: float = 2.0
+    ) -> Approval:
+        """Await the final approval, or raise :class:`ApprovalTimeoutError`."""
+        _wait_args(timeout, poll)
+        getter = cast(Optional[AsyncGetApproval], self._approval_get)
+        sleep = cast(Optional[AsyncSleep], self._sleep)
+        if getter is None or sleep is None:
+            raise TypeError(UNBOUND_APPROVAL)
+
+        started = time.monotonic()
+        slept = 0.0
+        while True:
+            approval = await getter(self.approval.id)
+            if approval.status != "pending":
+                return approval
+            elapsed = max(time.monotonic() - started, slept)
+            remaining = timeout - elapsed
+            if remaining <= 0:
+                raise ApprovalTimeoutError(self.approval.id, timeout)
+            if remaining < poll:
+                await sleep(remaining)
+                raise ApprovalTimeoutError(self.approval.id, timeout)
+            await sleep(poll)
+            slept += poll
+            if max(time.monotonic() - started, slept) >= timeout:
+                raise ApprovalTimeoutError(self.approval.id, timeout)

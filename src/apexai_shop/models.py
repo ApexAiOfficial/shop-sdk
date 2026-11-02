@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
+    "Approval",
     "ApprovalInfo",
     "Attention",
     "BundleComponent",
@@ -506,6 +507,24 @@ class ApprovalInfo(_Model):
     id: int
     status: str
     expires_at: datetime
+    reasons: List[str]
+
+
+class Approval(_Model):
+    """A queued change waiting for, or decided by, the store owner."""
+
+    id: int
+    operation: str
+    target: str
+    status: str
+    """``pending``, ``done``, ``rejected``, ``expired``, ``changed`` or ``failed``."""
+    effect: "Effect"
+    reasons: List[str]
+    created_at: datetime
+    expires_at: datetime
+    decided_at: Optional[datetime]
+    result: Optional[Dict[str, Any]]
+    error: Optional[str]
 
 
 class Effect(_Model):

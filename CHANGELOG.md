@@ -26,6 +26,13 @@ Writes: categories, items, prices, coupons, support and fulfilment. Requires a s
   previews are `AsyncConfirmationRequired`, whose `confirm()` is typed as awaitable.
   `Completed.result` and a preview's `confirmation` and `effect` are never `None`: an
   answer without them is an `invalid_response` error.
+- Owner approvals can be read with `approvals.get(approval_id)`, returning the
+  new `Approval` model. `PendingApproval.wait(timeout=, poll=)` polls through
+  `Shop` until a final status and raises `ApprovalTimeoutError` only when it is
+  still pending at the timeout; `AsyncPendingApproval.wait()` is awaitable and
+  has the same behavior. A queued change is not made unless the owner taps
+  Approve in Telegram within 15 minutes and must never be reported as done from
+  its initial 202 response.
 - `repr()` never shows a confirmation id, `ConfirmationInfo`'s included.
 - A `confirmation_invalid` that follows an attempt whose answer was lost says so: that
   attempt may have spent the confirmation, and nothing was changed.
@@ -89,8 +96,8 @@ Writes: categories, items, prices, coupons, support and fulfilment. Requires a s
 
 ### Changed
 
-- The bundled contract (`contract/merchant-api-v1.json`) includes catalog, coupon,
-  licence-key inventory, support and fulfilment writes;
+- The bundled contract (`contract/merchant-api-v1.json`) adds the approval read
+  and documents 202 `pending_approval` for deep price cuts and large coupons;
   the contract tests also check every write's body fields and declared idempotency header,
   and that every nullable body field is optional (the client leaves out `None`).
 - CI type-checks the package, the examples and the README's write examples with

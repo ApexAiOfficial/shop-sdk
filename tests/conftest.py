@@ -49,6 +49,20 @@ COUPON = {
     "uses": {"paid": 3, "open_checkouts": 1},
 }
 
+APPROVAL = {
+    "id": 12,
+    "operation": "update_item",
+    "target": "item:10",
+    "status": "pending",
+    "effect": {"summary": "Cut Guide's price from 300 to 100 Stars.", "details": {}},
+    "reasons": ["price_cut_over_50_percent"],
+    "created_at": "2026-11-02T12:00:00Z",
+    "expires_at": "2026-11-02T12:15:00Z",
+    "decided_at": None,
+    "result": None,
+    "error": None,
+}
+
 
 def answer(status: str = "done", **fields: Any) -> Dict[str, Any]:
     """A write's envelope: ``done`` unless ``status`` says otherwise, every field present."""
@@ -77,6 +91,7 @@ def preview(confirmation_id: str = "conf_abc123", summary: str = "Delete the cat
 
 
 SAMPLES: Dict[str, Any] = {
+    "get_approval": APPROVAL,
     "get_store": {
         "api_version": "1", "api_revision": "2026-11-02",
         "store": {"name": "Demo Store", "tier": "business", "currency": "XTR"},
@@ -319,6 +334,7 @@ SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250
 
 #: (method, request path after the base URL) -> operation id, for routing mock requests.
 ROUTES = {
+    ("GET", "/approvals/12"): "get_approval",
     ("GET", "/store"): "get_store",
     ("GET", "/attention"): "needs_attention",
     ("GET", "/categories"): "list_categories",

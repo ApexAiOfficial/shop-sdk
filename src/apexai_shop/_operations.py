@@ -26,6 +26,7 @@ class Operation(NamedTuple):
 
 OPERATIONS: Dict[str, Operation] = {
     # --- reads -------------------------------------------------------------
+    "get_approval": Operation("GET", "/approvals/{approval_id}"),
     "get_store": Operation("GET", "/store"),
     "needs_attention": Operation("GET", "/attention"),
     "list_categories": Operation("GET", "/categories", ("limit", "cursor")),

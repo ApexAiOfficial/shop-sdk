@@ -30,6 +30,7 @@ __all__ = [
     "AuthenticationError",
     "PermissionDeniedError",
     "ApprovalRequiredError",
+    "ApprovalTimeoutError",
     "WritesDisabledError",
     "NotFoundError",
     "BadRequestError",
@@ -128,6 +129,19 @@ class ApprovalRequiredError(PermissionDeniedError):
         if self.reasons:
             text += f" [reasons: {'; '.join(self.reasons)}]"
         return text
+
+
+class ApprovalTimeoutError(ShopError):
+    """A queued approval was still pending when ``PendingApproval.wait`` timed out."""
+
+    def __init__(self, approval_id: int, timeout: float) -> None:
+        self.approval_id = approval_id
+        self.timeout = timeout
+        super().__init__(
+            None,
+            "approval_timeout",
+            f"Approval {approval_id} is still pending after {timeout:g} seconds.",
+        )
 
 
 class WritesDisabledError(PermissionDeniedError):

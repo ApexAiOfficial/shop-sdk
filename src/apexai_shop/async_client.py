@@ -27,6 +27,7 @@ from . import _core
 from . import _keys
 from .errors import ConnectionError, ShopError
 from .models import (
+    Approval,
     Attention,
     Category,
     CategoryAnswer,
@@ -78,7 +79,7 @@ from .models import (
     TicketSummary,
     WriteAnswer,
 )
-from .results import AsyncConfirmationRequired, Completed, WriteResult
+from .results import AsyncConfirmationRequired, AsyncPendingApproval, Completed, WriteResult
 
 __all__ = ["AsyncShop"]
 
@@ -121,6 +122,7 @@ class AsyncShop:
         )
         self._sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
 
+        self.approvals = AsyncApprovals(self)
         self.categories = AsyncCategories(self)
         self.items = AsyncItems(self)
         self.coupons = AsyncCoupons(self)
@@ -204,6 +206,9 @@ class AsyncShop:
                 idempotency_key=confirm_key,
             )
 
+        async def approval_sleep(seconds: float) -> None:
+            await self._sleep(seconds)
+
         preview_class = AsyncConfirmationRequired
         bind_preview = _core.preview_binder(model, confirm, preview_class=preview_class)
         try:
@@ -214,7 +219,15 @@ class AsyncShop:
                 idempotency_key=key,
                 bind_preview=bind_preview,
             )
-            return _core.parse_write(response, model, confirm, preview_class=preview_class)
+            return _core.parse_write(
+                response,
+                model,
+                confirm,
+                preview_class=preview_class,
+                pending_class=AsyncPendingApproval,
+                approval_get=self.approvals.get,
+                sleep=approval_sleep,
+            )
         except ShopError as exc:
             exc.idempotency_key = key
             raise
@@ -279,6 +292,14 @@ class AsyncShop:
 class _AsyncResource:
     def __init__(self, shop: AsyncShop) -> None:
         self._shop = shop
+
+
+class AsyncApprovals(_AsyncResource):
+    async def get(self, approval_id: int) -> Approval:
+        """A queued change and whether the store owner approved it."""
+        return await self._shop._call(
+            "get_approval", Approval, path_params={"approval_id": approval_id}
+        )
 
 
 class AsyncCategories(_AsyncResource):

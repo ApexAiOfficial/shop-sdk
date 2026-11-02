@@ -84,6 +84,7 @@ asyncio.run(main())
 | --- | --- | --- |
 | `store()` | `GET /store` | `StoreResponse`: the store and this token (name, scopes, expiry) |
 | `attention()` | `GET /attention` | `Attention`: payments for an operator, low stock, open tickets |
+| `approvals.get(approval_id)` | `GET /approvals/{approval_id}` | `Approval`: the final or pending outcome of a queued owner approval |
 | `categories.list(limit=, cursor=)` / `categories.iter()` | `GET /categories` | `CategoryPage` / `Category` |
 | `items.list(q=, category=, status=, limit=, cursor=)` / `items.iter(...)` | `GET /items` | `ItemPage` / `ItemSummary` |
 | `items.get(item_id)` | `GET /items/{item_id}` | `ItemDetail` |
@@ -250,6 +251,17 @@ API refuses with `ChangedError`, whose `preview` is a fresh
 shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
 (`result.answer.model_dump(mode="json")`), id included, to return as data.
 
+**Owner approvals.** Deep price cuts, large coupons, and ticket replies that
+contain contact details can answer `PendingApproval`. The change is queued but
+is not made unless the store owner taps **Approve** in Telegram within 15
+minutes; never report it as done from the 202 answer. Call
+`pending.wait(timeout=900, poll=2)` to poll through the originating `Shop` and
+return the final `Approval`, or use `shop.approvals.get(pending.approval.id)`
+directly. Rejected, expired, changed and failed approvals are returned normally
+so callers can branch on `approval.status`; an approval that is still pending at
+the timeout raises `ApprovalTimeoutError`. With `AsyncShop`, the result is an
+`AsyncPendingApproval` and `await pending.wait(...)` provides the same behavior.
+
 **Idempotency.** Every store-changing write sends an `Idempotency-Key` header:
 a random key per call, the same on each of the client's own retries. If a retry
 reaches the store after the first attempt already made the change, the API answers with the
@@ -349,6 +361,7 @@ write raises also carry its `idempotency_key` (see
 | `AuthenticationError` | 401: a missing or unknown token (`unauthorized`), or one the store issued that no longer works: `token_expired`, `token_revoked`, or `token_inactive` (its creator is no longer the store owner) |
 | `PermissionDeniedError` | 403: the token lacks the scope |
 | `ApprovalRequiredError` | 403 `approval_required`: refused because the change needs the owner's approval; nothing was queued, so ask the owner to make it in the bot; `reasons` says why (a `PermissionDeniedError`). A `PendingApproval` result, by contrast, is queued and waits for the owner's Approve |
+| `ApprovalTimeoutError` | `PendingApproval.wait()` reached its timeout while the approval was still pending; the queued change may still be approved later |
 | `WritesDisabledError` | 403 `writes_disabled`: changes through the API are off for this store (a `PermissionDeniedError`) |
 | `NotFoundError` | 404: no such item, order or category |
 | `BadRequestError` | 400 or 422: a parameter was refused (for writes also `nothing_to_change`, `not_empty`, `idempotency_key_reused`); `fields` names the offending parameters |

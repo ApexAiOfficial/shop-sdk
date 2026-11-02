@@ -50,3 +50,15 @@ try:
     created = shop.categories.create("Guides")
 except (ConnectionError, ServerError) as exc:
     created = shop.categories.create("Guides", idempotency_key=exc.idempotency_key)
+
+# --- owner approval waits ---------------------------------------------------
+
+from apexai_shop import AsyncPendingApproval, PendingApproval, models
+
+
+def wait_for_approval(pending: PendingApproval[object]) -> models.Approval:
+    return pending.wait(timeout=900, poll=2)
+
+
+async def wait_for_approval_async(pending: AsyncPendingApproval[object]) -> models.Approval:
+    return await pending.wait(timeout=900, poll=2)

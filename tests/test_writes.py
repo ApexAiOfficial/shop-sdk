@@ -546,7 +546,12 @@ def test_confirmation_invalid():
 def test_pending_approval():
     pending = answer(
         "pending_approval",
-        approval={"id": 12, "status": "pending", "expires_at": "2026-11-02T12:15:00Z"},
+        approval={
+            "id": 12,
+            "status": "pending",
+            "expires_at": "2026-11-02T12:15:00Z",
+            "reasons": ["owner_approval"],
+        },
         effect={"summary": "Rename the category.", "details": {}},
         next="Ask the store owner to tap Approve in the bot's private chat.",
     )

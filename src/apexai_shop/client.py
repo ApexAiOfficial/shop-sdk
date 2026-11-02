@@ -26,6 +26,7 @@ from . import _core
 from . import _keys
 from .errors import ConnectionError, ShopError
 from .models import (
+    Approval,
     Attention,
     Category,
     CategoryAnswer,
@@ -126,6 +127,7 @@ class Shop:
         self._client = http_client if http_client is not None else httpx.Client(timeout=timeout)
         self._sleep: Callable[[float], None] = time.sleep
 
+        self.approvals = Approvals(self)
         self.categories = Categories(self)
         self.items = Items(self)
         self.coupons = Coupons(self)
@@ -207,6 +209,9 @@ class Shop:
                 idempotency_key=confirm_key,
             )
 
+        def approval_sleep(seconds: float) -> None:
+            self._sleep(seconds)
+
         bind_preview = _core.preview_binder(model, confirm, preview_class=ConfirmationRequired)
         try:
             response = self._send(
@@ -216,7 +221,14 @@ class Shop:
                 idempotency_key=key,
                 bind_preview=bind_preview,
             )
-            return _core.parse_write(response, model, confirm, preview_class=ConfirmationRequired)
+            return _core.parse_write(
+                response,
+                model,
+                confirm,
+                preview_class=ConfirmationRequired,
+                approval_get=self.approvals.get,
+                sleep=approval_sleep,
+            )
         except ShopError as exc:
             exc.idempotency_key = key
             raise
@@ -280,6 +292,14 @@ class Shop:
 class _Resource:
     def __init__(self, shop: Shop) -> None:
         self._shop = shop
+
+
+class Approvals(_Resource):
+    def get(self, approval_id: int) -> Approval:
+        """A queued change and whether the store owner approved it."""
+        return self._shop._call(
+            "get_approval", Approval, path_params={"approval_id": approval_id}
+        )
 
 
 class Categories(_Resource):

@@ -435,6 +435,9 @@ def write_result(
     request_id: Optional[str] = None,
     replayed: bool = False,
     preview_class: Type[ConfirmationRequired[Any]] = ConfirmationRequired,
+    pending_class: Type[PendingApproval[Any]] = PendingApproval,
+    approval_get: Optional[Callable[[int], Any]] = None,
+    sleep: Optional[Callable[[float], Any]] = None,
 ) -> WriteResult[Any]:
     """Wrap a parsed envelope in :class:`Completed`, :class:`ConfirmationRequired`
     (``preview_class``) or :class:`PendingApproval` (a plain :class:`WriteResult`
@@ -447,6 +450,8 @@ def write_result(
     typed results.
     """
     cls: Type[WriteResult[Any]] = _RESULT_CLASSES.get(answer.status, WriteResult)
+    if cls is PendingApproval:
+        cls = pending_class
     missing = None
     if cls is ConfirmationRequired:
         cls = preview_class
@@ -454,7 +459,7 @@ def write_result(
             missing = "confirmation"
         elif answer.effect is None:
             missing = "effect"
-    elif cls is PendingApproval and answer.approval is None:
+    elif issubclass(cls, PendingApproval) and answer.approval is None:
         missing = "approval"
     elif cls is Completed and answer.result is None and _types_result(answer):
         raise ShopError(
@@ -471,7 +476,14 @@ def write_result(
             f"The API answered {answer.status} without {missing}.",
             request_id,
         )
-    return cls(answer, request_id=request_id, replayed=replayed, confirm=confirm)
+    return cls(
+        answer,
+        request_id=request_id,
+        replayed=replayed,
+        confirm=confirm,
+        approval_get=approval_get,
+        sleep=sleep,
+    )
 
 
 def parse_write(
@@ -480,6 +492,9 @@ def parse_write(
     confirm: Optional[Confirm] = None,
     *,
     preview_class: Type[ConfirmationRequired[Any]] = ConfirmationRequired,
+    pending_class: Type[PendingApproval[Any]] = PendingApproval,
+    approval_get: Optional[Callable[[int], Any]] = None,
+    sleep: Optional[Callable[[float], Any]] = None,
 ) -> WriteResult[Any]:
     """A write's successful (200 or 202) ``response`` as a typed result."""
     answer = parse_response(response, model)
@@ -491,6 +506,9 @@ def parse_write(
         request_id=response.headers.get("x-request-id"),
         replayed=replayed,
         preview_class=preview_class,
+        pending_class=pending_class,
+        approval_get=approval_get,
+        sleep=sleep,
     )
 
 

@@ -11,6 +11,7 @@ from .async_client import AsyncShop
 from .client import Shop
 from .results import (
     AsyncConfirmationRequired,
+    AsyncPendingApproval,
     Completed,
     ConfirmationRequired,
     PendingApproval,
@@ -19,6 +20,7 @@ from .results import (
 from .webhooks import WebhookEvent, WebhookVerificationError, verify_webhook
 from .errors import (
     ApprovalRequiredError,
+    ApprovalTimeoutError,
     AuthenticationError,
     BadRequestError,
     ChangedError,
@@ -46,10 +48,12 @@ __all__ = [
     "ConfirmationRequired",
     "AsyncConfirmationRequired",
     "PendingApproval",
+    "AsyncPendingApproval",
     "ShopError",
     "AuthenticationError",
     "PermissionDeniedError",
     "ApprovalRequiredError",
+    "ApprovalTimeoutError",
     "WritesDisabledError",
     "NotFoundError",
     "BadRequestError",

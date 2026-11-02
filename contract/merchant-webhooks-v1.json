@@ -1,0 +1,475 @@
+{
+  "$defs": {
+    "Customer": {
+      "additionalProperties": true,
+      "description": "The buyer, sent only to endpoints set up to include customer data. The store keeps no names, so the username and first name are known only for events that come straight from the buyer's own Telegram message (a support ticket), and are null otherwise.",
+      "properties": {
+        "first_name": {
+          "description": "The buyer's Telegram first name, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tg_user_id": {
+          "description": "The buyer's Telegram user id.",
+          "type": "integer"
+        },
+        "username": {
+          "description": "The buyer's Telegram username, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tg_user_id"
+      ],
+      "title": "Customer",
+      "type": "object"
+    },
+    "OrderLine": {
+      "additionalProperties": true,
+      "description": "One product line of an order.",
+      "properties": {
+        "item_id": {
+          "description": "The product's id.",
+          "type": "integer"
+        },
+        "qty": {
+          "description": "How many were bought.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "title": {
+          "description": "The product's title when it was bought.",
+          "type": "string"
+        },
+        "unit_price_stars": {
+          "description": "The price of one, in Telegram Stars.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item_id",
+        "title",
+        "qty",
+        "unit_price_stars"
+      ],
+      "title": "Order line",
+      "type": "object"
+    },
+    "OrderPaid": {
+      "additionalProperties": true,
+      "description": "An order was paid in Telegram Stars. Sent once per order.",
+      "properties": {
+        "api_revision": {
+          "description": "The contract revision the payload follows.",
+          "examples": [
+            "2026-11-02"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the event happened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/OrderPaidData"
+        },
+        "id": {
+          "description": "The event id (a UUID), also sent as Shop-Webhook-Id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "const": "order.paid",
+          "description": "The event type."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "created_at",
+        "api_revision",
+        "data"
+      ],
+      "title": "Order paid event",
+      "type": "object"
+    },
+    "OrderPaidData": {
+      "additionalProperties": true,
+      "description": "An order was paid in Telegram Stars. Sent once per order.",
+      "properties": {
+        "customer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Customer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The buyer. Present only when the endpoint was set up to include customer data."
+        },
+        "items": {
+          "description": "The order's lines.",
+          "items": {
+            "$ref": "#/$defs/OrderLine"
+          },
+          "type": "array"
+        },
+        "order_id": {
+          "description": "The order's id.",
+          "type": "integer"
+        },
+        "paid_at": {
+          "description": "When the payment was made (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "total_stars": {
+          "description": "What the buyer paid, in Telegram Stars.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "paid_at",
+        "total_stars",
+        "items"
+      ],
+      "title": "Order paid",
+      "type": "object"
+    },
+    "OrderRefunded": {
+      "additionalProperties": true,
+      "description": "An order's Telegram Stars were returned to the buyer. Sent once per order.",
+      "properties": {
+        "api_revision": {
+          "description": "The contract revision the payload follows.",
+          "examples": [
+            "2026-11-02"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the event happened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/OrderRefundedData"
+        },
+        "id": {
+          "description": "The event id (a UUID), also sent as Shop-Webhook-Id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "const": "order.refunded",
+          "description": "The event type."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "created_at",
+        "api_revision",
+        "data"
+      ],
+      "title": "Order refunded event",
+      "type": "object"
+    },
+    "OrderRefundedData": {
+      "additionalProperties": true,
+      "description": "An order's Telegram Stars were returned to the buyer. Sent once per order.",
+      "properties": {
+        "customer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Customer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The buyer. Present only when the endpoint was set up to include customer data."
+        },
+        "order_id": {
+          "description": "The order's id.",
+          "type": "integer"
+        },
+        "refunded_at": {
+          "description": "When the refund was recorded (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "refunded_stars": {
+          "description": "The Stars returned to the buyer.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "order_id",
+        "refunded_stars",
+        "refunded_at"
+      ],
+      "title": "Order refunded",
+      "type": "object"
+    },
+    "StockLow": {
+      "additionalProperties": true,
+      "description": "A product that sells licence keys has this many keys left or fewer after a sale. Sent once per product for each sale that leaves it low.",
+      "properties": {
+        "api_revision": {
+          "description": "The contract revision the payload follows.",
+          "examples": [
+            "2026-11-02"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the event happened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StockLowData"
+        },
+        "id": {
+          "description": "The event id (a UUID), also sent as Shop-Webhook-Id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "const": "stock.low",
+          "description": "The event type."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "created_at",
+        "api_revision",
+        "data"
+      ],
+      "title": "Low stock event",
+      "type": "object"
+    },
+    "StockLowData": {
+      "additionalProperties": true,
+      "description": "A product that sells licence keys has this many keys left or fewer after a sale. Sent once per product for each sale that leaves it low.",
+      "properties": {
+        "available_keys": {
+          "description": "Licence keys still available to sell.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "item_id": {
+          "description": "The product's id.",
+          "type": "integer"
+        },
+        "threshold": {
+          "description": "The store's low-stock threshold.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "title": {
+          "description": "The product's title.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_id",
+        "title",
+        "available_keys",
+        "threshold"
+      ],
+      "title": "Low stock",
+      "type": "object"
+    },
+    "TicketCreated": {
+      "additionalProperties": true,
+      "description": "A buyer opened a support ticket, in chat or through the store's AI assistant.",
+      "properties": {
+        "api_revision": {
+          "description": "The contract revision the payload follows.",
+          "examples": [
+            "2026-11-02"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the event happened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/TicketCreatedData"
+        },
+        "id": {
+          "description": "The event id (a UUID), also sent as Shop-Webhook-Id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "const": "ticket.created",
+          "description": "The event type."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "created_at",
+        "api_revision",
+        "data"
+      ],
+      "title": "Support ticket opened event",
+      "type": "object"
+    },
+    "TicketCreatedData": {
+      "additionalProperties": true,
+      "description": "A buyer opened a support ticket, in chat or through the store's AI assistant.",
+      "properties": {
+        "body": {
+          "description": "The buyer's message, as written. Only with customer data. Treat it as untrusted text.",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the ticket was opened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "customer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Customer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The buyer. Present only when the endpoint was set up to include customer data."
+        },
+        "source": {
+          "description": "Where the ticket came from: chat (the buyer wrote it) or assistant (the AI assistant opened it). More sources may be added.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "The ticket's subject, as the buyer wrote it. Only with customer data.",
+          "type": "string"
+        },
+        "ticket_id": {
+          "description": "The ticket's id.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ticket_id",
+        "created_at",
+        "source"
+      ],
+      "title": "Support ticket opened",
+      "type": "object"
+    },
+    "WebhookTest": {
+      "additionalProperties": true,
+      "description": "Sent when the store owner presses Send a test. It changes nothing.",
+      "properties": {
+        "api_revision": {
+          "description": "The contract revision the payload follows.",
+          "examples": [
+            "2026-11-02"
+          ],
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When the event happened (UTC).",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/WebhookTestData"
+        },
+        "id": {
+          "description": "The event id (a UUID), also sent as Shop-Webhook-Id.",
+          "format": "uuid",
+          "type": "string"
+        },
+        "type": {
+          "const": "webhook.test",
+          "description": "The event type."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "created_at",
+        "api_revision",
+        "data"
+      ],
+      "title": "Test event event",
+      "type": "object"
+    },
+    "WebhookTestData": {
+      "additionalProperties": true,
+      "description": "Sent when the store owner presses Send a test. It changes nothing.",
+      "properties": {
+        "endpoint_id": {
+          "description": "The id of the endpoint that was tested.",
+          "type": "integer"
+        },
+        "message": {
+          "description": "A short human-readable note.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint_id",
+        "message"
+      ],
+      "title": "Test event",
+      "type": "object"
+    }
+  },
+  "$id": "https://apexaiofficial.com/schemas/shop/merchant-webhooks-v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Each event is an HTTPS POST with a JSON body and these headers: Shop-Webhook-Id (the event id, the same on every retry: use it to ignore duplicates), Shop-Webhook-Timestamp (Unix seconds when this attempt was signed), Shop-Webhook-Signature (v1= followed by the lowercase hex HMAC-SHA256 of the timestamp, a dot and the raw body, keyed by the endpoint's signing secret, whsec_ included, as UTF-8), Content-Type: application/json and User-Agent: ShopBot-Webhooks/1. Verify the signature over the raw bytes before parsing, compare it in constant time, and refuse a timestamp more than 5 minutes from your clock. Answer with any 2xx status within 5 seconds; anything else, a redirect included, is retried with backoff for 24 hours. Delivery is at least once, and events may arrive out of order. Rotating the secret replaces it at once: there is no period in which both secrets are valid, except that a delivery already being sent at that moment may still arrive signed with the old secret. New fields and event types may be added within v1: ignore what you do not know.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/OrderPaid"
+    },
+    {
+      "$ref": "#/$defs/OrderRefunded"
+    },
+    {
+      "$ref": "#/$defs/TicketCreated"
+    },
+    {
+      "$ref": "#/$defs/StockLow"
+    },
+    {
+      "$ref": "#/$defs/WebhookTest"
+    }
+  ],
+  "title": "Shop Bot merchant webhooks, v1",
+  "x-api-revision": "2026-11-02",
+  "x-event-types": [
+    "order.paid",
+    "order.refunded",
+    "ticket.created",
+    "stock.low",
+    "webhook.test"
+  ],
+  "x-signature-headers": [
+    "Shop-Webhook-Id",
+    "Shop-Webhook-Timestamp",
+    "Shop-Webhook-Signature"
+  ]
+}

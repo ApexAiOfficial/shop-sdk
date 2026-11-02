@@ -9,6 +9,7 @@ from . import models
 from ._version import __version__
 from .async_client import AsyncShop
 from .client import Shop
+from .webhooks import WebhookEvent, WebhookVerificationError, verify_webhook
 from .errors import (
     AuthenticationError,
     BadRequestError,
@@ -33,4 +34,7 @@ __all__ = [
     "RateLimitError",
     "ServerError",
     "ConnectionError",
+    "verify_webhook",
+    "WebhookEvent",
+    "WebhookVerificationError",
 ]

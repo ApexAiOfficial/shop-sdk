@@ -73,6 +73,8 @@ class TokenInfo(_Model):
 
 class StoreResponse(_Model):
     api_version: str
+    #: The contract revision the store serves (a date); additive within version 1.
+    api_revision: str
     store: StoreInfo
     token: TokenInfo
 

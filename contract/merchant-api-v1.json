@@ -1338,6 +1338,11 @@
       "StoreResponse": {
         "additionalProperties": false,
         "properties": {
+          "api_revision": {
+            "description": "The contract revision this store serves (a date); additive within version 1.",
+            "title": "Api Revision",
+            "type": "string"
+          },
           "api_version": {
             "const": "1",
             "title": "Api Version",
@@ -1352,6 +1357,7 @@
         },
         "required": [
           "api_version",
+          "api_revision",
           "store",
           "token"
         ],
@@ -1415,6 +1421,13 @@
         "title": "TopItem",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "token": {
+        "description": "A merchant API token (shp_\u2026) the owner minted with /apitoken.",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -1428,24 +1441,6 @@
       "get": {
         "description": "What needs the merchant now: payments for an operator, low stock, open tickets.",
         "operationId": "needs_attention",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -1457,6 +1452,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1465,7 +1470,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -1498,6 +1503,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Needs Attention"
       }
     },
@@ -1534,22 +1544,6 @@
               ],
               "title": "Cursor"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -1563,6 +1557,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1571,7 +1575,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -1604,6 +1608,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "List Categories"
       }
     },
@@ -1686,22 +1695,6 @@
               ],
               "title": "Cursor"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -1715,6 +1708,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1723,7 +1726,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -1756,6 +1759,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "List Items"
       }
     },
@@ -1774,22 +1782,6 @@
               "title": "Item Id",
               "type": "integer"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -1803,6 +1795,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -1811,7 +1813,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -1854,6 +1856,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Get Item"
       }
     },
@@ -1961,22 +1968,6 @@
               ],
               "title": "Cursor"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -2008,7 +1999,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2041,6 +2032,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "List Orders"
       }
     },
@@ -2059,22 +2055,6 @@
               "title": "Order Id",
               "type": "integer"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -2088,6 +2068,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -2096,7 +2086,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2139,6 +2129,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Get Order"
       }
     },
@@ -2163,22 +2158,6 @@
               ],
               "title": "Cursor"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -2192,6 +2171,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -2200,7 +2189,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2233,6 +2222,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "List Payments"
       }
     },
@@ -2253,22 +2247,6 @@
               "minimum": 1,
               "title": "Days",
               "type": "integer"
-            }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
             }
           }
         ],
@@ -2301,7 +2279,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2334,6 +2312,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Sales Summary"
       }
     },
@@ -2370,22 +2353,6 @@
               ],
               "title": "Cursor"
             }
-          },
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
           }
         ],
         "responses": {
@@ -2399,6 +2366,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -2407,7 +2384,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2440,6 +2417,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "List Stock"
       }
     },
@@ -2447,24 +2429,6 @@
       "get": {
         "description": "The store and the token itself: who you are talking to, and what you may do.",
         "operationId": "get_store",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "authorization",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
@@ -2476,6 +2440,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -2484,7 +2458,7 @@
                 }
               }
             },
-            "description": "No token, or a token that is unknown, revoked or expired."
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
           },
           "403": {
             "content": {
@@ -2517,6 +2491,11 @@
             "description": "Too many requests; wait for Retry-After seconds."
           }
         },
+        "security": [
+          {
+            "token": []
+          }
+        ],
         "summary": "Get Store"
       }
     }

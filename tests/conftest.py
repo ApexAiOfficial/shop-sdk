@@ -38,7 +38,7 @@ SALES = {
 
 SAMPLES: Dict[str, Any] = {
     "get_store": {
-        "api_version": "1",
+        "api_version": "1", "api_revision": "2026-11-02",
         "store": {"name": "Demo Store", "tier": "business", "currency": "XTR"},
         "token": {
             "id": 7,

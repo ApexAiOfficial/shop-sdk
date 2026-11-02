@@ -106,12 +106,19 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 
 | Scope | Grants |
 | --- | --- |
+| (any token) | `store()`: the store and the token itself |
 | `catalog:read` | Categories and items (`categories`, `items`) |
 | `inventory:read` | Licence-key stock levels (`stock`) |
-| `orders:read` | Orders and order details (`orders`) |
+| `orders:read` | Orders, order details and open payments (`orders`, `payments`) |
 | `customers:read` | Buyer Telegram user ids in orders, and the `buyer=` filter. Without it, `buyer_tg_user_id` is `None` |
-| `reports:read` | Sales reports (`reports.summary`) |
+| `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupon data (no endpoint in this SDK version yet) |
+
+The bot offers three presets when a token is created: **read-only** (`catalog:read`,
+`inventory:read`, `orders:read`, `reports:read`, `coupons:read`), **operations** (adds
+`customers:read` and the support, catalog, stock, coupon and delivery scopes later API
+versions use) and **full** (adds broadcasts and refunds, each waiting for the owner's
+approval in Telegram). Version 1 only reads.
 
 Further scopes may be added as the API grows. Give each token only the scopes
 the job needs.
@@ -146,7 +153,7 @@ Every failure raises a subclass of `apexai_shop.ShopError`, which carries
 
 | Exception | When |
 | --- | --- |
-| `AuthenticationError` | 401: missing, unknown, revoked or expired token |
+| `AuthenticationError` | 401: a missing or unknown token (`unauthorized`), or one the store issued that no longer works: `token_expired`, `token_revoked`, or `token_inactive` (its creator is no longer the store owner) |
 | `PermissionDeniedError` | 403: the token lacks the scope |
 | `NotFoundError` | 404: no such item or order |
 | `BadRequestError` | 400 or 422: a parameter was refused; `fields` names the offending parameters |
@@ -168,7 +175,9 @@ except ShopError as exc:
 ```
 
 Reads are limited to **5 requests per second per token, with bursts of 20**.
-Over the limit the API answers 429 with a `Retry-After` header. The client
+`reports.summary()` and `orders.list(summary=True)`, which read a whole window,
+share a tighter budget of 1 a second (bursts of 5). Over a limit the API
+answers 429 with a `Retry-After` header. The client
 retries automatically (`max_retries=2` by default):
 
 - on 429 it waits for `Retry-After` (at most 30 seconds);

@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The project follows
 
 ## [0.3.0] - Unreleased
 
-Writes: categories, items, prices and coupons. Requires a store whose merchant API takes changes.
+Writes: categories, items, prices, coupons, support and fulfilment. Requires a store whose merchant API takes changes.
 
 ### Added
 
@@ -44,6 +44,20 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
   expires_at=)` and `coupons.update(code, active=, max_uses=, per_user_max_uses=,
   expires_at=, confirmation=)` (scope `coupons:write`). Switching off a used coupon
   previews first.
+- Support tickets: `tickets.list(include_closed=, limit=)`, `tickets.iter()` and
+  `tickets.get(ticket_id)` (scope `support:read`), plus
+  `tickets.reply(ticket_id, body)` and `tickets.close(ticket_id)` (scope
+  `support:write`), with typed ticket, thread, reply and close models. Buyer-written
+  subjects and messages are explicitly marked as untrusted data; buyer ids are `None`
+  without `customers:read`.
+- Fulfilment: `orders.restore_downloads(order_id, downloads=)` (scope
+  `fulfillment:write`) restores a paid order's file downloads and download window,
+  with a typed `DownloadsRestored` result and the per-order daily cap exposed as
+  `DailyCapError`.
+- Ticket replies and download restores keep the SDK's idempotency-key behavior and
+  the store's 10-minute duplicate protection. Replies over 4,000 characters are
+  refused rather than cut; replies containing contact details require the owner's
+  approval.
 - Licence-key inventory: `stock.item(item_id)` (scope `inventory:read`), plus
   `stock.stage`, `stock.commit`, `stock.void` and `stock.release` (scope
   `inventory:write`) with typed, key-free results. Voiding unsold keys and releasing
@@ -58,6 +72,9 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
   redacted from staging failures and logs.
 - Models: `Coupon`, `CouponUses`, `CouponPage`, `CouponAnswer`, `ItemAnswer`,
   `ItemMoveAnswer`, `ItemMoved`, `ItemDeleteAnswer`, `ItemDeleted`.
+- Support and fulfilment models: `TicketSummary`, `TicketPage`, `TicketMessage`,
+  `TicketDetail`, `TicketReplied`, `TicketReplyAnswer`, `TicketClosed`,
+  `TicketCloseAnswer`, `DownloadsRestored` and `DownloadsRestoreAnswer`.
 - Inventory models: `StockDetail`, `StockCounts`, `StockHolds`, `KeyStage`,
   `StagedImport`, `KeyImport`, `KeysVoided`, `HoldsReleased` and their write-answer
   models, plus the SDK's `KeyImportBatch` and `KeyImportSummary`.
@@ -72,8 +89,8 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
 
 ### Changed
 
-- The bundled contract (`contract/merchant-api-v1.json`) includes catalog, coupon and
-  licence-key inventory writes;
+- The bundled contract (`contract/merchant-api-v1.json`) includes catalog, coupon,
+  licence-key inventory, support and fulfilment writes;
   the contract tests also check every write's body fields and declared idempotency header,
   and that every nullable body field is optional (the client leaves out `None`).
 - CI type-checks the package, the examples and the README's write examples with

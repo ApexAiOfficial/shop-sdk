@@ -39,6 +39,8 @@ OPERATIONS: Dict[str, Operation] = {
         ("status", "since", "until", "buyer", "summary", "cursor"),
     ),
     "get_order": Operation("GET", "/orders/{order_id}"),
+    "list_tickets": Operation("GET", "/tickets", ("include_closed", "limit")),
+    "get_ticket": Operation("GET", "/tickets/{ticket_id}"),
     "list_payments": Operation("GET", "/payments", ("cursor",)),
     "sales_summary": Operation("GET", "/reports/summary", ("days",)),
     "list_coupons": Operation("GET", "/coupons", ("status", "code", "limit", "cursor")),
@@ -105,6 +107,21 @@ OPERATIONS: Dict[str, Operation] = {
         "POST",
         "/items/{item_id}/keys/release",
         body=("confirmation",),
+        uses_idempotency_key=True,
+    ),
+    "reply_ticket": Operation(
+        "POST",
+        "/tickets/{ticket_id}/replies",
+        body=("body",),
+        uses_idempotency_key=True,
+    ),
+    "close_ticket": Operation(
+        "POST", "/tickets/{ticket_id}/close", uses_idempotency_key=True
+    ),
+    "restore_downloads": Operation(
+        "POST",
+        "/orders/{order_id}/restore-downloads",
+        body=("downloads",),
         uses_idempotency_key=True,
     ),
 }

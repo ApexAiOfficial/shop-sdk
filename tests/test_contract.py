@@ -65,7 +65,7 @@ def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
     in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) == len(in_contract) == 26
+    assert len(OPERATIONS) == len(in_contract) == 31
 
 
 def test_operation_ids_match(contract):
@@ -252,6 +252,9 @@ def test_write_answer_subclasses_only_type_the_result(contract):
         "KeyImportAnswer",
         "KeysVoidAnswer",
         "HoldsReleaseAnswer",
+        "TicketReplyAnswer",
+        "TicketCloseAnswer",
+        "DownloadsRestoreAnswer",
     ):
         schema = contract["components"]["schemas"][name]
         assert set(schema["properties"]) == set(base["properties"])

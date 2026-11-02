@@ -185,6 +185,35 @@ SAMPLES: Dict[str, Any] = {
         "refundable": True,
         "refund_request": None,
     },
+    "list_tickets": {
+        "untrusted_fields": ["subject"],
+        "data": [
+            {
+                "id": 200,
+                "status": "open",
+                "subject": "My download expired",
+                "created_at": "2026-11-01T10:00:00Z",
+                "last_message_at": "2026-11-01T10:05:00Z",
+            }
+        ],
+    },
+    "get_ticket": {
+        "untrusted_fields": ["subject", "messages[].body"],
+        "id": 200,
+        "status": "open",
+        "subject": "My download expired",
+        "created_at": "2026-11-01T10:00:00Z",
+        "buyer_tg_user_id": None,
+        "messages": [
+            {
+                "author": "buyer",
+                "author_tg_user_id": None,
+                "body": "Could you restore it?",
+                "created_at": "2026-11-01T10:05:00Z",
+            }
+        ],
+        "omitted_messages": 0,
+    },
     "list_payments": {
         "health": {
             "pending_fulfillment": 0,
@@ -268,6 +297,22 @@ SAMPLES: Dict[str, Any] = {
     "release_key_holds": answer(
         result={"item_id": 10, "released": 2, "unheld": 7, "until": "2026-11-02T12:05:00Z"}
     ),
+    "reply_ticket": answer(
+        result={"ticket_id": 200, "status": "answered", "delivered": True}
+    ),
+    "close_ticket": answer(
+        result={"ticket_id": 200, "status": "closed", "notified": True}
+    ),
+    "restore_downloads": answer(
+        result={
+            "order_id": 100,
+            "files": 2,
+            "downloads": 5,
+            "expires_at": "2026-11-09T12:00:00Z",
+            "gift_unredeemed": False,
+            "notified": True,
+        }
+    ),
 }
 SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
 SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
@@ -283,6 +328,11 @@ ROUTES = {
     ("GET", "/items/10/stock"): "get_item_stock",
     ("GET", "/orders"): "list_orders",
     ("GET", "/orders/100"): "get_order",
+    ("POST", "/orders/100/restore-downloads"): "restore_downloads",
+    ("GET", "/tickets"): "list_tickets",
+    ("GET", "/tickets/200"): "get_ticket",
+    ("POST", "/tickets/200/replies"): "reply_ticket",
+    ("POST", "/tickets/200/close"): "close_ticket",
     ("GET", "/payments"): "list_payments",
     ("GET", "/reports/summary"): "sales_summary",
     ("POST", "/categories"): "create_category",

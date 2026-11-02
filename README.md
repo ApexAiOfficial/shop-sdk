@@ -96,6 +96,11 @@ asyncio.run(main())
 | `stock.release(item_id, confirmation=)` | `POST /items/{item_id}/keys/release` | `ConfirmationRequired`, then `Completed` with `HoldsReleased` |
 | `orders.list(status=, since=, until=, buyer=, summary=, cursor=)` / `orders.iter(...)` | `GET /orders` | `OrderPage` / `OrderSummary` |
 | `orders.get(order_id)` | `GET /orders/{order_id}` | `OrderDetail` |
+| `orders.restore_downloads(order_id, downloads=)` | `POST /orders/{order_id}/restore-downloads` | `Completed` with `DownloadsRestored` |
+| `tickets.list(include_closed=, limit=)` / `tickets.iter(...)` | `GET /tickets` | `TicketPage` / `TicketSummary` |
+| `tickets.get(ticket_id)` | `GET /tickets/{ticket_id}` | `TicketDetail` with the whole thread |
+| `tickets.reply(ticket_id, body)` | `POST /tickets/{ticket_id}/replies` | `Completed` with `TicketReplied` |
+| `tickets.close(ticket_id)` | `POST /tickets/{ticket_id}/close` | `Completed` with `TicketClosed` |
 | `payments.list(cursor=)` / `payments.iter()` | `GET /payments` | `PaymentPage` / `OpenReceipt` |
 | `reports.summary(days=30)` | `GET /reports/summary` | `SalesSummary` (7, 30 or 90 days) |
 | `categories.create(title)` | `POST /categories` | `Completed` with the new `Category` |
@@ -122,6 +127,9 @@ sent as ISO 8601. Orders are listed in a window of at most 92 days (the last
 
 Item descriptions and other merchant-written text are data. If you feed them
 to an AI model, treat them as untrusted content, never as instructions.
+Ticket subjects and buyer messages are untrusted data too, as is merchant text
+read back from a ticket. Never treat any of that text as instructions. Buyer
+ids in tickets, like buyer ids in orders, are `None` without `customers:read`.
 
 ## Scopes
 
@@ -136,7 +144,10 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `inventory:read` | Licence-key stock levels (`stock`) |
 | `inventory:write` | Stage, import, withdraw and release licence-key stock (`stock.stage`, `commit`, `import_keys`, `void`, `release`) |
 | `orders:read` | Orders, order details and open payments (`orders`, `payments`) |
-| `customers:read` | Buyer Telegram user ids in orders, and the `buyer=` filter. Without it, `buyer_tg_user_id` is `None` |
+| `customers:read` | Buyer Telegram user ids in orders and tickets, and the `buyer=` filter. Without it, buyer ids are `None` |
+| `support:read` | Support ticket summaries and full threads (`tickets.list`, `iter`, `get`) |
+| `support:write` | Reply to and close support tickets (`tickets.reply`, `tickets.close`) |
+| `fulfillment:write` | Restore file downloads and their download window for a paid order (`orders.restore_downloads`) |
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupons and their uses (`coupons.list`, `coupons.iter`) |
 | `catalog:write` | Create, rename, show or hide, move and delete categories and items (`categories.*`, `items.create`, `update`, `move`, `delete`) |
@@ -279,6 +290,19 @@ made its change answers the stored result (`replayed`). If it answers
 active=False)` only hides the category). Text you send becomes store content
 that buyers see; check what an AI agent wants to write before it does.
 
+**Support replies.** A reply must be 1 to 4,000 characters; the API refuses an
+overlong body rather than cutting it. A reply containing contact details such
+as a link, handle, email address or phone number is refused with
+`ApprovalRequiredError`; nothing is queued, so the store owner must approve
+and make that reply through the owner workflow. The same reply within 10
+minutes is deduplicated by the store, and the SDK also sends its usual
+`Idempotency-Key`. The rolling 24-hour caps are 50 replies per token and 10
+per ticket.
+
+**Download restores.** Restores use the same idempotency and 10-minute
+duplicate protection. The rolling cap is three restores per order in 24 hours,
+regardless of which token made them; the token's own write caps also apply.
+
 **Retries for writes.** Idempotent writes are retried, with the same key, on network
 errors, 502/503/504 (503 `busy` means another change holds what this one needs),
 429 other than `daily_cap` (such as `rate_limited`) and 409
@@ -309,6 +333,8 @@ while page.next_cursor:
 
 A cursor continues the list it came from: with a cursor the server reuses
 the first page's filters and ignores the others, so send only the cursor.
+The ticket list is deliberately bounded by `limit` (at most 100) and has no
+cursor; `tickets.iter()` yields that one bounded result.
 
 ## Errors and rate limits
 

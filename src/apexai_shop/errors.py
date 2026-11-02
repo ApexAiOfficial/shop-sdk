@@ -4,19 +4,35 @@ Every error the API returns becomes a :class:`ShopError` subclass carrying the
 HTTP status, the stable error code from the response body (for example
 ``unauthorized``, ``insufficient_scope`` or ``not_found``), a readable message
 and the request id when the server sent one. Errors never contain the token.
+
+Refused writes add a few classes keyed on their stable codes:
+:class:`ConflictError` (409, with :class:`ChangedError` and
+:class:`ConfirmationInvalidError`), :class:`StoreSuspendedError` (423),
+:class:`DailyCapError` (429 ``daily_cap``), :class:`ApprovalRequiredError` and
+:class:`WritesDisabledError` (403).
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .results import ConfirmationRequired
 
 __all__ = [
     "ShopError",
     "AuthenticationError",
     "PermissionDeniedError",
+    "ApprovalRequiredError",
+    "WritesDisabledError",
     "NotFoundError",
     "BadRequestError",
+    "ConflictError",
+    "ChangedError",
+    "ConfirmationInvalidError",
+    "StoreSuspendedError",
     "RateLimitError",
+    "DailyCapError",
     "ServerError",
     "ConnectionError",
 ]
@@ -57,7 +73,40 @@ class AuthenticationError(ShopError):
 
 
 class PermissionDeniedError(ShopError):
-    """403: the token lacks the scope this operation needs."""
+    """403: the token lacks the scope this operation needs (``insufficient_scope``).
+
+    :class:`ApprovalRequiredError` and :class:`WritesDisabledError` are the
+    other 403 answers a write can get.
+    """
+
+
+class ApprovalRequiredError(PermissionDeniedError):
+    """403 ``approval_required``: this change needs the store owner's approval in Telegram.
+
+    ``reasons`` lists why, in the server's words. Until the API takes such
+    approvals itself, ask the store owner to make the change in the bot.
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        reasons: Optional[List[str]] = None,
+    ) -> None:
+        self.reasons: List[str] = list(reasons or [])
+        super().__init__(status, code, message, request_id)
+
+    def __str__(self) -> str:
+        text = super().__str__()
+        if self.reasons:
+            text += f" [reasons: {'; '.join(self.reasons)}]"
+        return text
+
+
+class WritesDisabledError(PermissionDeniedError):
+    """403 ``writes_disabled``: changes through the API are switched off for this store."""
 
 
 class NotFoundError(ShopError):
@@ -89,6 +138,59 @@ class BadRequestError(ShopError):
         return text
 
 
+class ConflictError(ShopError):
+    """409: the change conflicts with the store's current state.
+
+    For code ``conflict`` (an edit based on an outdated version), ``current``
+    holds the object as it is now, so you can show it and try again. Other
+    409 codes (``already_exists``, ``idempotency_in_progress``, ...) raise
+    this class too, with ``current`` set to ``None``.
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        current: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.current = current
+        super().__init__(status, code, message, request_id)
+
+
+class ChangedError(ConflictError):
+    """409 ``changed``: the effect changed between the preview and the confirmation.
+
+    Nothing was changed and the old confirmation is spent. ``preview`` is a
+    fresh :class:`~apexai_shop.ConfirmationRequired` for the same operation
+    and arguments: show the user its new ``effect`` and call
+    ``preview.confirm()`` only if they agree again.
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        preview: "Optional[ConfirmationRequired[Any]]" = None,
+    ) -> None:
+        self.preview = preview
+        super().__init__(status, code, message, request_id)
+
+
+class ConfirmationInvalidError(ConflictError):
+    """409 ``confirmation_invalid``: the confirmation is unknown, expired, used, or for other arguments.
+
+    Call the operation again without a confirmation for a new preview.
+    """
+
+
+class StoreSuspendedError(ShopError):
+    """423 ``store_suspended``: the store is suspended, so this change is refused."""
+
+
 class RateLimitError(ShopError):
     """429: too many requests. ``retry_after`` is in seconds, when known."""
 
@@ -102,6 +204,14 @@ class RateLimitError(ShopError):
     ) -> None:
         self.retry_after = retry_after
         super().__init__(status, code, message, request_id)
+
+
+class DailyCapError(RateLimitError):
+    """429 ``daily_cap``: the token spent a rolling 24-hour allowance of changes.
+
+    Never retried automatically. ``retry_after`` is the number of seconds
+    until the allowance has room again, when the server says.
+    """
 
 
 class ServerError(ShopError):

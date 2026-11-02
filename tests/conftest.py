@@ -36,6 +36,35 @@ SALES = {
     "live_members": 0,
 }
 
+CATEGORY = {"id": 1, "title": "Guides", "is_active": True, "items": 4, "hidden_items": 1}
+
+
+def answer(status: str = "done", **fields: Any) -> Dict[str, Any]:
+    """A write's envelope: ``done`` unless ``status`` says otherwise, every field present."""
+    body: Dict[str, Any] = {
+        "status": status,
+        "replayed": False,
+        "noop": False,
+        "result": None,
+        "confirmation": None,
+        "approval": None,
+        "effect": None,
+        "next": None,
+    }
+    body.update(fields)
+    return body
+
+
+def preview(confirmation_id: str = "conf_abc123", summary: str = "Delete the category Guides.") -> Dict[str, Any]:
+    """A ``confirmation_required`` envelope, as a two-step write's first call answers."""
+    return answer(
+        "confirmation_required",
+        confirmation={"id": confirmation_id, "expires_at": "2026-11-02T12:05:00Z"},
+        effect={"summary": summary, "details": {"category_id": 1, "title": "Guides"}},
+        next="Show the user this effect; call delete_category again with this confirmation only after they agree.",
+    )
+
+
 SAMPLES: Dict[str, Any] = {
     "get_store": {
         "api_version": "1", "api_revision": "2026-11-02",
@@ -169,20 +198,31 @@ SAMPLES: Dict[str, Any] = {
         "checkouts_paid": 3,
         "open_tickets": 0,
     },
+    "create_category": answer(result=CATEGORY),
+    "update_category": answer(result=dict(CATEGORY, title="Handbooks")),
+    "move_category": answer(result={"id": 1, "from_index": 2, "to_index": 0}),
+    "delete_category": answer(
+        result={"deleted": True, "category_id": 1},
+        effect={"summary": "Delete the category Guides.", "details": {"category_id": 1}},
+    ),
 }
 
-#: Request path (after the base URL) -> operation id, for routing mock requests.
+#: (method, request path after the base URL) -> operation id, for routing mock requests.
 ROUTES = {
-    "/store": "get_store",
-    "/attention": "needs_attention",
-    "/categories": "list_categories",
-    "/items": "list_items",
-    "/items/10": "get_item",
-    "/stock": "list_stock",
-    "/orders": "list_orders",
-    "/orders/100": "get_order",
-    "/payments": "list_payments",
-    "/reports/summary": "sales_summary",
+    ("GET", "/store"): "get_store",
+    ("GET", "/attention"): "needs_attention",
+    ("GET", "/categories"): "list_categories",
+    ("GET", "/items"): "list_items",
+    ("GET", "/items/10"): "get_item",
+    ("GET", "/stock"): "list_stock",
+    ("GET", "/orders"): "list_orders",
+    ("GET", "/orders/100"): "get_order",
+    ("GET", "/payments"): "list_payments",
+    ("GET", "/reports/summary"): "sales_summary",
+    ("POST", "/categories"): "create_category",
+    ("PATCH", "/categories/1"): "update_category",
+    ("POST", "/categories/1/move"): "move_category",
+    ("POST", "/categories/1/delete"): "delete_category",
 }
 
 PREFIX = "/api/merchant/v1"
@@ -192,7 +232,7 @@ def route(request: httpx.Request) -> httpx.Response:
     """A handler answering every operation with its sample payload."""
     path = request.url.path
     assert path.startswith(PREFIX + "/"), path
-    op = ROUTES.get(path[len(PREFIX):])
+    op = ROUTES.get((request.method, path[len(PREFIX):]))
     if op is None:
         return httpx.Response(404, json={"error": "not_found"})
     return httpx.Response(200, json=SAMPLES[op])

@@ -1,6 +1,31 @@
 {
   "components": {
     "schemas": {
+      "ApprovalInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "expires_at"
+        ],
+        "title": "ApprovalInfo",
+        "type": "object"
+      },
       "Attention": {
         "additionalProperties": false,
         "properties": {
@@ -97,6 +122,313 @@
         "title": "Category",
         "type": "object"
       },
+      "CategoryAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "CategoryAnswer",
+        "type": "object"
+      },
+      "CategoryDeleteAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoryDeleted"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "CategoryDeleteAnswer",
+        "type": "object"
+      },
+      "CategoryDeleted": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted",
+          "category_id"
+        ],
+        "title": "CategoryDeleted",
+        "type": "object"
+      },
+      "CategoryMoveAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoryMoved"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "CategoryMoveAnswer",
+        "type": "object"
+      },
+      "CategoryMoved": {
+        "additionalProperties": false,
+        "properties": {
+          "from_index": {
+            "title": "From Index",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "to_index": {
+            "title": "To Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "from_index",
+          "to_index"
+        ],
+        "title": "CategoryMoved",
+        "type": "object"
+      },
       "CategoryPage": {
         "additionalProperties": false,
         "properties": {
@@ -124,6 +456,86 @@
           "next_cursor"
         ],
         "title": "CategoryPage",
+        "type": "object"
+      },
+      "Confirm": {
+        "additionalProperties": false,
+        "description": "A two-step write: without ``confirmation`` it previews; with the id a preview returned, it applies.",
+        "properties": {
+          "confirmation": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation"
+          }
+        },
+        "title": "Confirm",
+        "type": "object"
+      },
+      "ConfirmationInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "description": "Single use; pass it back as confirmation once the user agrees.",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "title": "ConfirmationInfo",
+        "type": "object"
+      },
+      "CreateCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CreateCategory",
+        "type": "object"
+      },
+      "Effect": {
+        "additionalProperties": false,
+        "properties": {
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "summary": {
+            "description": "One line for the user: what the change does.",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "details"
+        ],
+        "title": "Effect",
         "type": "object"
       },
       "Error": {
@@ -542,6 +954,23 @@
           "revoked"
         ],
         "title": "KeyCounts",
+        "type": "object"
+      },
+      "MoveCategory": {
+        "additionalProperties": false,
+        "properties": {
+          "to_index": {
+            "description": "The new place, 0-based; past the end means last.",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "To Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "to_index"
+        ],
+        "title": "MoveCategory",
         "type": "object"
       },
       "OpenReceipt": {
@@ -1420,6 +1849,202 @@
         ],
         "title": "TopItem",
         "type": "object"
+      },
+      "UpdateCategory": {
+        "additionalProperties": false,
+        "description": "Null (or absent) leaves a field as it is; set at least one.",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "false hides the category and every item in it.",
+            "title": "Active"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "UpdateCategory",
+        "type": "object"
+      },
+      "WriteAnswer": {
+        "additionalProperties": false,
+        "description": "Every write's answer: done (200), or confirmation_required or pending_approval (202).",
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "title": "Result",
+            "type": "null"
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "WriteAnswer",
+        "type": "object"
+      },
+      "WriteError": {
+        "additionalProperties": false,
+        "description": "A refused write: a stable code, a sentence for people, and what some codes add.",
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "conflict: the current state.",
+            "title": "Current"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "invalid_request: the fields, never their values.",
+            "title": "Fields"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WriteAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "changed: a fresh preview to show and confirm."
+          },
+          "reasons": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "approval_required: why.",
+            "title": "Reasons"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "WriteError",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -1614,6 +2239,634 @@
           }
         ],
         "summary": "List Categories"
+      },
+      "post": {
+        "description": "Create a category, shown in the store, at the end of the category list.",
+        "operationId": "create_category",
+        "parameters": [
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Create Category"
+      }
+    },
+    "/categories/{category_id}": {
+      "patch": {
+        "description": "Rename a category, or show or hide it with every item in it. Unchanged values answer noop.",
+        "operationId": "update_category",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Category Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Update Category"
+      }
+    },
+    "/categories/{category_id}/delete": {
+      "post": {
+        "description": "Delete an empty category in two calls: without confirmation the answer (202) is the effect and a confirmation id; send that id back once the user agrees.",
+        "operationId": "delete_category",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Category Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Confirm"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDeleteAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryDeleteAnswer"
+                }
+              }
+            },
+            "description": "confirmation_required: the effect, and a confirmation id to send back once the user agrees."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Delete Category"
+      }
+    },
+    "/categories/{category_id}/move": {
+      "post": {
+        "description": "Move a category to a new place in the store's category list.",
+        "operationId": "move_category",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Category Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryMoveAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Move Category"
       }
     },
     "/items": {
@@ -1866,7 +3119,7 @@
     },
     "/orders": {
       "get": {
-        "description": "Orders newest first, in a window of at most 92 days (the last 92 by default). With a\ncursor, the filters are the first page's and the parameters are ignored.",
+        "description": "Orders newest first, in a window of at most 92 days (the last 92 by default). With a cursor, the filters are the first page's and the parameters are ignored.",
         "operationId": "list_orders",
         "parameters": [
           {

@@ -9,16 +9,24 @@ from . import models
 from ._version import __version__
 from .async_client import AsyncShop
 from .client import Shop
+from .results import Completed, ConfirmationRequired, PendingApproval, WriteResult
 from .webhooks import WebhookEvent, WebhookVerificationError, verify_webhook
 from .errors import (
+    ApprovalRequiredError,
     AuthenticationError,
     BadRequestError,
+    ChangedError,
+    ConfirmationInvalidError,
+    ConflictError,
     ConnectionError,
+    DailyCapError,
     NotFoundError,
     PermissionDeniedError,
     RateLimitError,
     ServerError,
     ShopError,
+    StoreSuspendedError,
+    WritesDisabledError,
 )
 
 __all__ = [
@@ -26,12 +34,23 @@ __all__ = [
     "Shop",
     "AsyncShop",
     "models",
+    "WriteResult",
+    "Completed",
+    "ConfirmationRequired",
+    "PendingApproval",
     "ShopError",
     "AuthenticationError",
     "PermissionDeniedError",
+    "ApprovalRequiredError",
+    "WritesDisabledError",
     "NotFoundError",
     "BadRequestError",
+    "ConflictError",
+    "ChangedError",
+    "ConfirmationInvalidError",
+    "StoreSuspendedError",
     "RateLimitError",
+    "DailyCapError",
     "ServerError",
     "ConnectionError",
     "verify_webhook",

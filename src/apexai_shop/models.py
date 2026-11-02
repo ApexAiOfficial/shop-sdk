@@ -5,20 +5,33 @@ ignore fields they do not know, so an additive server change never breaks an
 existing client. Values the contract lists as enums are typed as ``str`` for
 the same reason: a new status or tier arrives as a plain string instead of a
 validation error. Amounts are whole Telegram Stars.
+
+Writes answer an envelope (:class:`WriteAnswer` and its per-operation
+subclasses such as :class:`CategoryAnswer`); the client turns it into a
+:class:`~apexai_shop.Completed`, :class:`~apexai_shop.ConfirmationRequired`
+or :class:`~apexai_shop.PendingApproval`.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
 __all__ = [
+    "ApprovalInfo",
     "Attention",
     "BundleComponent",
     "Category",
+    "CategoryAnswer",
+    "CategoryDeleteAnswer",
+    "CategoryDeleted",
+    "CategoryMoveAnswer",
+    "CategoryMoved",
     "CategoryPage",
+    "ConfirmationInfo",
+    "Effect",
     "ItemBundle",
     "ItemDetail",
     "ItemFile",
@@ -46,6 +59,7 @@ __all__ = [
     "StoreResponse",
     "TokenInfo",
     "TopItem",
+    "WriteAnswer",
 ]
 
 
@@ -343,3 +357,68 @@ class SalesSummary(_Model):
     checkouts: int
     checkouts_paid: int
     open_tickets: int
+
+
+# --- writes ----------------------------------------------------------------
+
+
+class ConfirmationInfo(_Model):
+    id: str
+    """Single use; pass it back as ``confirmation`` once the user agrees."""
+    expires_at: datetime
+
+
+class ApprovalInfo(_Model):
+    id: int
+    status: str
+    expires_at: datetime
+
+
+class Effect(_Model):
+    summary: str
+    """One line for the user: what the change does."""
+    details: Dict[str, Any]
+
+
+class WriteAnswer(_Model):
+    """Every write's answer: ``done`` (200), or ``confirmation_required`` or ``pending_approval`` (202).
+
+    Each write operation has a subclass whose ``result`` is typed; in this base
+    (a preview inside a 409 ``changed`` error, for example) it is always ``None``.
+    """
+
+    status: str
+    """``done``, ``confirmation_required`` or ``pending_approval``."""
+    replayed: bool
+    """True when this is the stored answer of an earlier identical request."""
+    noop: bool
+    """True when nothing needed to change."""
+    result: None
+    confirmation: Optional[ConfirmationInfo]
+    approval: Optional[ApprovalInfo]
+    effect: Optional[Effect]
+    next: Optional[str]
+    """What to do next, for an agent."""
+
+
+class CategoryAnswer(WriteAnswer):
+    result: Optional[Category]  # type: ignore[assignment]
+
+
+class CategoryMoved(_Model):
+    id: int
+    from_index: int
+    to_index: int
+
+
+class CategoryMoveAnswer(WriteAnswer):
+    result: Optional[CategoryMoved]  # type: ignore[assignment]
+
+
+class CategoryDeleted(_Model):
+    deleted: bool
+    category_id: int
+
+
+class CategoryDeleteAnswer(WriteAnswer):
+    result: Optional[CategoryDeleted]  # type: ignore[assignment]

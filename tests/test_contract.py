@@ -9,10 +9,12 @@ import pytest
 from pydantic import BaseModel
 
 from apexai_shop import models
+from apexai_shop._core import IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN
 from apexai_shop._operations import OPERATIONS
 from conftest import SAMPLES
 
-EXCLUDED_SCHEMAS = {"Error", "InvalidRequest"}
+#: Error bodies become exceptions, not models.
+ERROR_SCHEMAS = {"Error", "InvalidRequest", "WriteError"}
 
 
 def _operations(contract):
@@ -21,11 +23,35 @@ def _operations(contract):
             yield method.upper(), path, op
 
 
+def _ref_name(schema):
+    """The schema name a ``$ref`` (possibly inside ``anyOf`` with null) points to, or None."""
+    if "$ref" in schema:
+        return schema["$ref"].rsplit("/", 1)[-1]
+    for option in schema.get("anyOf", []):
+        if "$ref" in option:
+            return option["$ref"].rsplit("/", 1)[-1]
+    return None
+
+
+def _body_schema_name(op):
+    body = op.get("requestBody")
+    if body is None:
+        return None
+    return _ref_name(body["content"]["application/json"]["schema"])
+
+
+def _request_body_schemas(contract):
+    """Schemas used only as request bodies: the operations table's body fields, not models."""
+    names = {_body_schema_name(op) for _, _, op in _operations(contract)}
+    return names - {None}
+
+
 def _schemas(contract):
+    excluded = ERROR_SCHEMAS | _request_body_schemas(contract)
     return {
         name: schema
         for name, schema in contract["components"]["schemas"].items()
-        if name not in EXCLUDED_SCHEMAS
+        if name not in excluded
     }
 
 
@@ -36,9 +62,9 @@ def test_contract_is_version_1(contract):
 
 def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
-    in_table = {(method, path) for method, path, _ in OPERATIONS.values()}
+    in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) == len(in_contract) == 10
+    assert len(OPERATIONS) == len(in_contract) == 14
 
 
 def test_operation_ids_match(contract):
@@ -52,14 +78,64 @@ def test_query_and_path_params_match(contract):
         params = op.get("parameters", [])
         query = {p["name"] for p in params if p["in"] == "query"}
         path_params = {p["name"] for p in params if p["in"] == "path"}
-        _, table_path, table_query = OPERATIONS[op["operationId"]]
-        assert set(table_query) == query, op["operationId"]
-        assert len(table_query) == len(set(table_query))
-        assert set(re.findall(r"{(\w+)}", table_path)) == path_params
+        table = OPERATIONS[op["operationId"]]
+        assert set(table.query) == query, op["operationId"]
+        assert len(table.query) == len(set(table.query))
+        assert set(re.findall(r"{(\w+)}", table.path)) == path_params
 
 
-def test_every_v01_operation_is_a_get():
-    assert {method for method, _, _ in OPERATIONS.values()} == {"GET"}
+def test_body_fields_match_request_body(contract):
+    schemas = contract["components"]["schemas"]
+    for method, _, op in _operations(contract):
+        table = OPERATIONS[op["operationId"]]
+        name = _body_schema_name(op)
+        if name is None:
+            assert "requestBody" not in op, op["operationId"]
+            assert table.body == (), op["operationId"]
+            continue
+        assert set(table.body) == set(schemas[name]["properties"]), op["operationId"]
+        assert len(table.body) == len(set(table.body))
+
+
+def test_reads_are_gets_and_writes_have_bodies(contract):
+    for method, _, op in _operations(contract):
+        table = OPERATIONS[op["operationId"]]
+        assert table.is_write == (method != "GET"), op["operationId"]
+        assert table.is_write == ("requestBody" in op), op["operationId"]
+    assert {op.method for op in OPERATIONS.values()} == {"GET", "POST", "PATCH"}
+
+
+def test_writes_take_the_idempotency_key_header(contract):
+    for method, _, op in _operations(contract):
+        headers = {p["name"]: p for p in op.get("parameters", []) if p["in"] == "header"}
+        if method == "GET":
+            assert IDEMPOTENCY_HEADER not in headers, op["operationId"]
+            continue
+        header = headers[IDEMPOTENCY_HEADER]
+        assert header["required"] is False
+        patterns = [o["pattern"] for o in header["schema"]["anyOf"] if "pattern" in o]
+        assert patterns == [IDEMPOTENCY_KEY_PATTERN.pattern], op["operationId"]
+
+
+def test_confirmable_writes_send_confirmation_in_the_body(contract):
+    """Every write that may answer 202 confirmation_required takes ``confirmation``."""
+    for method, _, op in _operations(contract):
+        if "confirmation_required" in op["responses"].get("202", {}).get("description", ""):
+            assert "confirmation" in OPERATIONS[op["operationId"]].body, op["operationId"]
+
+
+def test_write_answers_and_errors_are_documented(contract):
+    for method, _, op in _operations(contract):
+        if method == "GET":
+            continue
+        responses = op["responses"]
+        answer = _ref_name(responses["200"]["content"]["application/json"]["schema"])
+        assert issubclass(getattr(models, answer), models.WriteAnswer), op["operationId"]
+        if "202" in responses:
+            assert _ref_name(responses["202"]["content"]["application/json"]["schema"]) == answer
+        for status in ("400", "403", "404", "409", "422", "423", "429", "503"):
+            schema = responses[status]["content"]["application/json"]["schema"]
+            assert _ref_name(schema) == "WriteError", (op["operationId"], status)
 
 
 def test_every_schema_has_a_model(contract):
@@ -85,6 +161,8 @@ def test_model_fields_match_schema(contract, name):
 
 
 def _nullable(prop) -> bool:
+    if prop.get("type") == "null":
+        return True
     return any(option.get("type") == "null" for option in prop.get("anyOf", []))
 
 
@@ -103,7 +181,7 @@ def test_model_nullability_and_datetimes_match_schema(contract, name):
     hints = typing.get_type_hints(model)
     for field, prop in schema["properties"].items():
         args = typing.get_args(hints[field])
-        allows_none = type(None) in args
+        allows_none = hints[field] is type(None) or type(None) in args
         assert allows_none == _nullable(prop), f"{name}.{field}"
         if _is_datetime(prop):
             assert hints[field] is datetime or datetime in args, f"{name}.{field}"
@@ -123,3 +201,13 @@ def test_test_samples_cover_every_operation_and_validate(contract):
         ref = op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
         model = getattr(models, ref.rsplit("/", 1)[-1])
         model.model_validate(SAMPLES[op["operationId"]])
+
+
+def test_write_answer_subclasses_only_type_the_result(contract):
+    """Each operation's answer is the WriteAnswer envelope with a typed ``result``."""
+    base = contract["components"]["schemas"]["WriteAnswer"]
+    for name in ("CategoryAnswer", "CategoryMoveAnswer", "CategoryDeleteAnswer"):
+        schema = contract["components"]["schemas"][name]
+        assert set(schema["properties"]) == set(base["properties"])
+        assert schema["required"] == base["required"]
+        assert issubclass(getattr(models, name), models.WriteAnswer)

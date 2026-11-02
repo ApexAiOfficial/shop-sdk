@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
-from typing import Any, AsyncIterator, Awaitable, Callable, Mapping, Optional, Set, Type, TypeVar
+from typing import (
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    Mapping,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+)
 
 import httpx
 from pydantic import BaseModel
@@ -14,6 +25,11 @@ from .errors import ConnectionError
 from .models import (
     Attention,
     Category,
+    CategoryAnswer,
+    CategoryDeleteAnswer,
+    CategoryDeleted,
+    CategoryMoveAnswer,
+    CategoryMoved,
     CategoryPage,
     ItemDetail,
     ItemPage,
@@ -27,18 +43,22 @@ from .models import (
     StockLevel,
     StockPage,
     StoreResponse,
+    WriteAnswer,
 )
+from .results import WriteResult
 
 __all__ = ["AsyncShop"]
 
 M = TypeVar("M", bound=BaseModel)
+A = TypeVar("A", bound=WriteAnswer)
 
 
 class AsyncShop:
     """Async client for one store's merchant API.
 
     Same arguments and methods as :class:`~apexai_shop.Shop`; methods are
-    coroutines and ``iter`` methods return async iterators::
+    coroutines, ``iter`` methods return async iterators, and a preview's
+    ``confirm()`` is awaited::
 
         async with AsyncShop() as shop:
             async for order in shop.orders.iter(status="paid"):
@@ -116,14 +136,62 @@ class AsyncShop:
         path_params: Optional[Mapping[str, Any]] = None,
         query: Optional[Mapping[str, Any]] = None,
     ) -> M:
-        method, url, params = _core.build_request(
-            self._base_url, operation_id, path_params, query
+        response = await self._send(operation_id, path_params=path_params, query=query)
+        return _core.parse_response(response, model)
+
+    async def _write(
+        self,
+        operation_id: str,
+        model: Type[A],
+        *,
+        path_params: Optional[Mapping[str, Any]] = None,
+        body: Optional[Mapping[str, Any]] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Any]:
+        """One logical write: one ``Idempotency-Key``, reused by every retry."""
+        key = _core.idempotency_key(idempotency_key)
+        fixed_path: Dict[str, Any] = dict(path_params or {})
+        fixed_body: Dict[str, Any] = dict(body or {})
+
+        async def confirm(confirmation: str, confirm_key: Optional[str]) -> WriteResult[Any]:
+            return await self._write(
+                operation_id,
+                model,
+                path_params=fixed_path,
+                body={**fixed_body, "confirmation": confirmation},
+                idempotency_key=confirm_key,
+            )
+
+        response = await self._send(
+            operation_id,
+            path_params=fixed_path,
+            body=fixed_body,
+            idempotency_key=key,
+            bind_preview=_core.preview_binder(model, confirm),
         )
+        return _core.parse_write(response, model, confirm)
+
+    async def _send(
+        self,
+        operation_id: str,
+        *,
+        path_params: Optional[Mapping[str, Any]] = None,
+        query: Optional[Mapping[str, Any]] = None,
+        body: Optional[Mapping[str, Any]] = None,
+        idempotency_key: Optional[str] = None,
+        bind_preview: Optional[Callable[[Dict[str, Any]], Any]] = None,
+    ) -> httpx.Response:
+        """Send one operation with retries; return the successful response or raise."""
+        method, url, params, json_body = _core.build_request(
+            self._base_url, operation_id, path_params, query, body
+        )
+        headers = _core.request_headers(self._headers, idempotency_key)
+        write = json_body is not None
         attempt = 0
         while True:
             try:
                 response = await self._client.request(
-                    method, url, params=params, headers=self._headers
+                    method, url, params=params, json=json_body, headers=headers
                 )
             except httpx.TransportError as exc:
                 if attempt < self._max_retries:
@@ -132,13 +200,13 @@ class AsyncShop:
                     continue
                 raise ConnectionError(_core.connection_message(exc)) from exc
             if response.status_code < 400:
-                return _core.parse_response(response, model)
-            delay = _core.retry_delay(response, attempt)
+                return response
+            delay = _core.retry_delay(response, attempt, write=write)
             if delay is not None and attempt < self._max_retries:
                 await self._sleep(delay)
                 attempt += 1
                 continue
-            raise _core.error_from_response(response)
+            raise _core.error_from_response(response, bind_preview)
 
     async def _paginate(
         self, operation_id: str, page_model: Type[Any], query: Mapping[str, Any]
@@ -173,6 +241,62 @@ class AsyncCategories(_AsyncResource):
     def iter(self, *, limit: Optional[int] = None) -> AsyncIterator[Category]:
         """Every category, following ``next_cursor``."""
         return self._shop._paginate("list_categories", CategoryPage, {"limit": limit})
+
+    async def create(
+        self, title: str, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[Category]:
+        """Create a category, shown in the store, at the end of the category list."""
+        return await self._shop._write(
+            "create_category",
+            CategoryAnswer,
+            body={"title": title},
+            idempotency_key=idempotency_key,
+        )
+
+    async def update(
+        self,
+        category_id: int,
+        *,
+        title: Optional[str] = None,
+        active: Optional[bool] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Category]:
+        """Rename a category, or show or hide it with every item in it. ``None`` leaves a field."""
+        return await self._shop._write(
+            "update_category",
+            CategoryAnswer,
+            path_params={"category_id": category_id},
+            body={"title": title, "active": active},
+            idempotency_key=idempotency_key,
+        )
+
+    async def move(
+        self, category_id: int, to_index: int, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[CategoryMoved]:
+        """Move a category to a new place in the list (0-based; past the end means last)."""
+        return await self._shop._write(
+            "move_category",
+            CategoryMoveAnswer,
+            path_params={"category_id": category_id},
+            body={"to_index": to_index},
+            idempotency_key=idempotency_key,
+        )
+
+    async def delete(
+        self,
+        category_id: int,
+        *,
+        confirmation: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[CategoryDeleted]:
+        """Delete an empty category in two steps: a preview, then ``await preview.confirm()``."""
+        return await self._shop._write(
+            "delete_category",
+            CategoryDeleteAnswer,
+            path_params={"category_id": category_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
 
 
 class AsyncItems(_AsyncResource):

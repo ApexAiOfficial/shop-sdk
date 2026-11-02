@@ -874,3 +874,35 @@ def test_async_lost_answer_note_and_unconfirmable_preview():
     assert invalid.idempotency_key == rec.requests[1].headers["idempotency-key"]
     assert refused.code == "invalid_response"
     assert len(rec.requests) == 4
+
+
+def test_an_undecodable_answer_is_retried_with_the_same_key_and_carries_it():
+    keys = []
+
+    def handler(request):
+        keys.append(request.headers["idempotency-key"])
+        raise httpx.DecodingError("Error -3 while decompressing data", request=request)
+
+    shop, _, _ = make_shop(handler, max_retries=1)
+    with pytest.raises(ConnectionError) as info:
+        shop.categories.create("Guides")
+    assert len(keys) == 2 and len(set(keys)) == 1
+    assert info.value.idempotency_key == keys[0]
+    assert "DecodingError" in info.value.message
+
+
+def test_async_an_undecodable_answer_carries_the_key():
+    keys = []
+
+    def handler(request):
+        keys.append(request.headers["idempotency-key"])
+        raise httpx.DecodingError("Error -3 while decompressing data", request=request)
+
+    async def scenario():
+        shop, _, _ = make_async_shop(handler, max_retries=0)
+        with pytest.raises(ConnectionError) as info:
+            await shop.categories.create("Guides")
+        return info.value
+
+    err = asyncio.run(scenario())
+    assert err.idempotency_key == keys[0]

@@ -205,7 +205,8 @@ client that made the preview, so call it before the client is closed. To
 confirm later, pass `confirmation=preview.confirmation` (or its `id`) to the
 same method with the same arguments. If the effect changed in the meantime the
 API refuses with `ChangedError`, whose `preview` is a fresh
-`ConfirmationRequired` to show and confirm again. The confirmation id is never
+`ConfirmationRequired` to show and confirm again (with `AsyncShop`, an
+`AsyncConfirmationRequired`: `await err.preview.confirm()`). The confirmation id is never
 shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
 (`result.answer.model_dump(mode="json")`), id included, to return as data.
 

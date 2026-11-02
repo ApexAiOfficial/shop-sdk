@@ -206,7 +206,7 @@ class Shop:
                 response = self._client.request(
                     method, url, params=params, json=json_body, headers=headers
                 )
-            except httpx.TransportError as exc:
+            except httpx.RequestError as exc:  # transport errors, and answers that cannot be decoded
                 if attempt < self._max_retries:
                     answer_lost = answer_lost or _core.may_have_arrived(exc)
                     self._sleep(_core.backoff(attempt))

@@ -180,7 +180,11 @@ class ChangedError(ConflictError):
     Nothing was changed and the old confirmation is spent. ``preview`` is a
     fresh :class:`~apexai_shop.ConfirmationRequired` for the same operation
     and arguments: show the user its new ``effect`` and call
-    ``preview.confirm()`` only if they agree again.
+    ``preview.confirm()`` only if they agree again. Under
+    :class:`~apexai_shop.AsyncShop` it is an
+    :class:`~apexai_shop.AsyncConfirmationRequired`, whose ``confirm()`` must
+    be awaited; check ``isinstance(err.preview, AsyncConfirmationRequired)``
+    so a type checker knows it too.
     """
 
     def __init__(

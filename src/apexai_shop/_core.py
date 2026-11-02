@@ -199,14 +199,15 @@ def backoff(attempt: int) -> float:
     return BACKOFF[min(attempt, len(BACKOFF) - 1)]
 
 
-def may_have_arrived(failure: Union[httpx.TransportError, httpx.Response]) -> bool:
+def may_have_arrived(failure: Union[httpx.RequestError, httpx.Response]) -> bool:
     """Whether a retried attempt may have reached the server although its answer was lost.
 
-    True for a transport error after the connection was made (a read timeout,
-    a reset), a 502 or 504 from a gateway, and 409 ``idempotency_in_progress``
-    (an earlier attempt with the same key is still running).
+    True for a request error after the connection was made (a read timeout, a
+    reset, an answer that could not be decoded), a 502 or 504 from a gateway,
+    and 409 ``idempotency_in_progress`` (an earlier attempt with the same key
+    is still running).
     """
-    if isinstance(failure, httpx.TransportError):
+    if isinstance(failure, httpx.RequestError):
         return not isinstance(failure, NOT_SENT_ERRORS)
     if failure.status_code in GATEWAY_STATUSES:
         return True

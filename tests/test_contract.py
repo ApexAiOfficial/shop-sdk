@@ -15,6 +15,7 @@ from conftest import SAMPLES
 
 #: Error bodies become exceptions, not models.
 ERROR_SCHEMAS = {"Error", "InvalidRequest", "WriteError"}
+SDK_ONLY_MODELS = {"KeyImportBatch", "KeyImportSummary"}
 
 
 def _operations(contract):
@@ -64,7 +65,7 @@ def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
     in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) == len(in_contract) == 21
+    assert len(OPERATIONS) == len(in_contract) == 26
 
 
 def test_operation_ids_match(contract):
@@ -127,11 +128,24 @@ def test_writes_take_the_idempotency_key_header(contract):
         headers = {p["name"]: p for p in op.get("parameters", []) if p["in"] == "header"}
         if method == "GET":
             assert IDEMPOTENCY_HEADER not in headers, op["operationId"]
+            assert not OPERATIONS[op["operationId"]].uses_idempotency_key
+            continue
+        declared = IDEMPOTENCY_HEADER in headers
+        assert OPERATIONS[op["operationId"]].uses_idempotency_key == declared
+        if not declared:
+            assert IDEMPOTENCY_HEADER not in headers
             continue
         header = headers[IDEMPOTENCY_HEADER]
         assert header["required"] is False
         patterns = [o["pattern"] for o in header["schema"]["anyOf"] if "pattern" in o]
         assert patterns == [IDEMPOTENCY_KEY_PATTERN.pattern], op["operationId"]
+    assert {"stage_key_import"} == {
+        op["operationId"]
+        for method, _, op in _operations(contract)
+        if method != "GET"
+        and IDEMPOTENCY_HEADER
+        not in {p["name"] for p in op.get("parameters", []) if p["in"] == "header"}
+    }
 
 
 def test_confirmable_writes_send_confirmation_in_the_body(contract):
@@ -170,12 +184,12 @@ def test_every_schema_has_a_model(contract):
 
 
 def test_no_model_without_a_schema(contract):
-    names = set(_schemas(contract))
+    names = set(_schemas(contract)) | SDK_ONLY_MODELS
     for name in models.__all__:
         assert name in names, name
 
 
-@pytest.mark.parametrize("name", sorted(set(models.__all__)))
+@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS))
 def test_model_fields_match_schema(contract, name):
     schema = contract["components"]["schemas"][name]
     model = getattr(models, name)
@@ -196,7 +210,7 @@ def _is_datetime(prop) -> bool:
     return any(option.get("format") == "date-time" for option in prop.get("anyOf", []))
 
 
-@pytest.mark.parametrize("name", sorted(set(models.__all__)))
+@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS))
 def test_model_nullability_and_datetimes_match_schema(contract, name):
     from datetime import datetime
 
@@ -230,7 +244,15 @@ def test_test_samples_cover_every_operation_and_validate(contract):
 def test_write_answer_subclasses_only_type_the_result(contract):
     """Each operation's answer is the WriteAnswer envelope with a typed ``result``."""
     base = contract["components"]["schemas"]["WriteAnswer"]
-    for name in ("CategoryAnswer", "CategoryMoveAnswer", "CategoryDeleteAnswer"):
+    for name in (
+        "CategoryAnswer",
+        "CategoryMoveAnswer",
+        "CategoryDeleteAnswer",
+        "KeyStageAnswer",
+        "KeyImportAnswer",
+        "KeysVoidAnswer",
+        "HoldsReleaseAnswer",
+    ):
         schema = contract["components"]["schemas"][name]
         assert set(schema["properties"]) == set(base["properties"])
         assert schema["required"] == base["required"]

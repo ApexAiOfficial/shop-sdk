@@ -9,10 +9,13 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
 
 ### Added
 
-- Writes send a JSON body and an `Idempotency-Key` header: a random key per call (or
+- Store-changing writes send a JSON body and an `Idempotency-Key` header: a random key per call (or
   your own with `idempotency_key=`), the same on every retry of that call, so a retry
   never changes the store twice.
-- Every error a write raises carries the call's `idempotency_key`. A `ConnectionError`,
+- Key staging is intentionally non-idempotent in the contract. It sends no
+  `Idempotency-Key` and is not retried after an ambiguous failure, avoiding duplicate
+  open stages.
+- Every error from an idempotent write carries the call's `idempotency_key`. A `ConnectionError`,
   `ServerError` or `invalid_response` does not say whether the change was made; repeating
   the same call with that key answers the stored result or makes the change once.
 - Typed write results with the API's envelope fields (`status`, `replayed`, `noop`,
@@ -41,8 +44,23 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
   expires_at=)` and `coupons.update(code, active=, max_uses=, per_user_max_uses=,
   expires_at=, confirmation=)` (scope `coupons:write`). Switching off a used coupon
   previews first.
+- Licence-key inventory: `stock.item(item_id)` (scope `inventory:read`), plus
+  `stock.stage`, `stock.commit`, `stock.void` and `stock.release` (scope
+  `inventory:write`) with typed, key-free results. Voiding unsold keys and releasing
+  checkout holds use the same two-step confirmation flow as other destructive writes.
+- `stock.import_keys(item_id, text=... or path=...)` reads explicit text or a UTF-8
+  file, splits it below 1,000 keys, 60,000 characters and a 60 KiB JSON body per
+  batch, stages and commits each batch, and returns secret-free per-batch and total
+  counts. A refusal reports how many batches committed. Turning on key delivery
+  requires explicit `enable_key_delivery=True`; `ConfirmKeyDeliveryError` never opts
+  in on the caller's behalf.
+- Licence-key text is excluded from result, error and summary representations and is
+  redacted from staging failures and logs.
 - Models: `Coupon`, `CouponUses`, `CouponPage`, `CouponAnswer`, `ItemAnswer`,
   `ItemMoveAnswer`, `ItemMoved`, `ItemDeleteAnswer`, `ItemDeleted`.
+- Inventory models: `StockDetail`, `StockCounts`, `StockHolds`, `KeyStage`,
+  `StagedImport`, `KeyImport`, `KeysVoided`, `HoldsReleased` and their write-answer
+  models, plus the SDK's `KeyImportBatch` and `KeyImportSummary`.
 - Exceptions for refused writes: `ConflictError` (409, with `current`), `ChangedError`
   (409 `changed`, with a fresh bound `preview`), `ConfirmationInvalidError`,
   `StoreSuspendedError` (423), `DailyCapError` (429 `daily_cap`, a `RateLimitError`),
@@ -54,12 +72,13 @@ Writes: categories, items, prices and coupons. Requires a store whose merchant A
 
 ### Changed
 
-- The bundled contract (`contract/merchant-api-v1.json`) includes the category writes;
-  the contract tests also check every write's body fields and `Idempotency-Key` header,
+- The bundled contract (`contract/merchant-api-v1.json`) includes catalog, coupon and
+  licence-key inventory writes;
+  the contract tests also check every write's body fields and declared idempotency header,
   and that every nullable body field is optional (the client leaves out `None`).
 - CI type-checks the package, the examples and the README's write examples with
   `mypy --strict` (`mypy` joins the `dev` extra).
-- Writes are retried on 409 `idempotency_in_progress`, 429 other than `daily_cap`, 502,
+- Idempotent writes are retried on 409 `idempotency_in_progress`, 429 other than `daily_cap`, 502,
   503 (including `busy`), 504 and network errors, only when Retry-After is at most 30
   seconds (backing off 0.5 s, 1 s, 2 s when there is none). Retries of reads are
   unchanged.

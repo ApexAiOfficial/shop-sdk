@@ -458,6 +458,30 @@
         "title": "CategoryPage",
         "type": "object"
       },
+      "CommitKeys": {
+        "additionalProperties": false,
+        "description": "The id stage_key_import returned: the keys are not sent again.",
+        "properties": {
+          "enable_key_delivery": {
+            "default": false,
+            "description": "Needed when the item does not sell keys yet: importing turns key delivery on for good.",
+            "title": "Enable Key Delivery",
+            "type": "boolean"
+          },
+          "staged_import": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Staged Import",
+            "type": "string"
+          }
+        },
+        "required": [
+          "staged_import"
+        ],
+        "title": "CommitKeys",
+        "type": "object"
+      },
       "Confirm": {
         "additionalProperties": false,
         "description": "A two-step write: without ``confirmation`` it previews; with the id a preview returned, it applies.",
@@ -877,6 +901,134 @@
           "error"
         ],
         "title": "Error",
+        "type": "object"
+      },
+      "HoldsReleaseAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldsReleased"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "HoldsReleaseAnswer",
+        "type": "object"
+      },
+      "HoldsReleased": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "released": {
+            "description": "Keys taken from unpaid checkouts, live or lapsed holds.",
+            "title": "Released",
+            "type": "integer"
+          },
+          "unheld": {
+            "description": "Free keys no checkout may hold until until, those included.",
+            "title": "Unheld",
+            "type": "integer"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when there was nothing to release.",
+            "title": "Until"
+          }
+        },
+        "required": [
+          "item_id",
+          "released",
+          "unheld",
+          "until"
+        ],
+        "title": "HoldsReleased",
         "type": "object"
       },
       "InvalidRequest": {
@@ -1591,6 +1743,409 @@
           "revoked"
         ],
         "title": "KeyCounts",
+        "type": "object"
+      },
+      "KeyImport": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "members_only": {
+            "title": "Members Only",
+            "type": "boolean"
+          },
+          "too_long": {
+            "title": "Too Long",
+            "type": "integer"
+          },
+          "turned_on_key_delivery": {
+            "title": "Turned On Key Delivery",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item_id",
+          "added",
+          "duplicates",
+          "too_long",
+          "available",
+          "members_only",
+          "turned_on_key_delivery"
+        ],
+        "title": "KeyImport",
+        "type": "object"
+      },
+      "KeyImportAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyImport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "KeyImportAnswer",
+        "type": "object"
+      },
+      "KeyStage": {
+        "additionalProperties": false,
+        "description": "What importing the staged keys would do now: counts only, never a key.",
+        "properties": {
+          "available_after": {
+            "title": "Available After",
+            "type": "integer"
+          },
+          "available_now": {
+            "title": "Available Now",
+            "type": "integer"
+          },
+          "comma_lines": {
+            "description": "Keys holding a comma: a CSV with several columns, say.",
+            "title": "Comma Lines",
+            "type": "integer"
+          },
+          "duplicates": {
+            "description": "Keys the item holds already, or repeated in the batch.",
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "hidden": {
+            "description": "The item or its category is not on sale.",
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "keys": {
+            "description": "Lines read as keys.",
+            "title": "Keys",
+            "type": "integer"
+          },
+          "members_only": {
+            "description": "In a members-only category: the keys cannot be bought singly or claimed.",
+            "title": "Members Only",
+            "type": "boolean"
+          },
+          "staged_import": {
+            "$ref": "#/components/schemas/StagedImport"
+          },
+          "too_long": {
+            "description": "Keys over 256 characters, which are skipped.",
+            "title": "Too Long",
+            "type": "integer"
+          },
+          "turns_on_key_delivery": {
+            "description": "The item does not sell keys yet: the commit needs enable_key_delivery.",
+            "title": "Turns On Key Delivery",
+            "type": "boolean"
+          },
+          "would_add": {
+            "title": "Would Add",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "staged_import",
+          "keys",
+          "would_add",
+          "duplicates",
+          "too_long",
+          "available_now",
+          "available_after",
+          "turns_on_key_delivery",
+          "members_only",
+          "comma_lines",
+          "hidden"
+        ],
+        "title": "KeyStage",
+        "type": "object"
+      },
+      "KeyStageAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "KeyStageAnswer",
+        "type": "object"
+      },
+      "KeysVoidAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeysVoided"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "KeysVoidAnswer",
+        "type": "object"
+      },
+      "KeysVoided": {
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "voided": {
+            "title": "Voided",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "voided"
+        ],
+        "title": "KeysVoided",
         "type": "object"
       },
       "MoveCategory": {
@@ -2312,6 +2867,152 @@
           "open_tickets"
         ],
         "title": "SalesSummary",
+        "type": "object"
+      },
+      "StageKeys": {
+        "additionalProperties": false,
+        "description": "Licence keys, one per line (blank lines and # comments are skipped): never answered or logged.",
+        "properties": {
+          "keys_text": {
+            "description": "At most 1,000 keys. Keys sent through an AI conversation reach the AI provider: for a sensitive batch, use the SDK, or send the bot /addkeys with a file.",
+            "maxLength": 60000,
+            "minLength": 1,
+            "title": "Keys Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keys_text"
+        ],
+        "title": "StageKeys",
+        "type": "object"
+      },
+      "StagedImport": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "description": "Single use; pass it to commit_key_import as staged_import once the user agrees.",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "title": "StagedImport",
+        "type": "object"
+      },
+      "StockCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "description": "Unsold keys, lapsed holds included.",
+            "title": "Available",
+            "type": "integer"
+          },
+          "reserved": {
+            "title": "Reserved",
+            "type": "integer"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          },
+          "sold": {
+            "title": "Sold",
+            "type": "integer"
+          },
+          "void": {
+            "title": "Void",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "reserved",
+          "sold",
+          "revoked",
+          "void"
+        ],
+        "title": "StockCounts",
+        "type": "object"
+      },
+      "StockDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "holds": {
+            "$ref": "#/components/schemas/StockHolds",
+            "description": "What release_key_holds would end now."
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "levels": {
+            "$ref": "#/components/schemas/StockCounts"
+          },
+          "low": {
+            "description": "Low on stock while for sale (the Needs attention count).",
+            "title": "Low",
+            "type": "boolean"
+          },
+          "low_stock_threshold": {
+            "title": "Low Stock Threshold",
+            "type": "integer"
+          },
+          "sells_keys": {
+            "description": "False until the item's first key import turns key delivery on.",
+            "title": "Sells Keys",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "voidable": {
+            "description": "Unsold keys void_keys would withdraw now.",
+            "title": "Voidable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "title",
+          "sells_keys",
+          "levels",
+          "voidable",
+          "holds",
+          "low_stock_threshold",
+          "low"
+        ],
+        "title": "StockDetail",
+        "type": "object"
+      },
+      "StockHolds": {
+        "additionalProperties": false,
+        "properties": {
+          "lapsed": {
+            "description": "Holds past their time: counted as available, until released or taken again.",
+            "title": "Lapsed",
+            "type": "integer"
+          },
+          "live": {
+            "description": "Keys held by unpaid checkouts that can still be paid.",
+            "title": "Live",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "live",
+          "lapsed"
+        ],
+        "title": "StockHolds",
         "type": "object"
       },
       "StockLevel": {
@@ -4842,6 +5543,655 @@
         "summary": "Delete Item"
       }
     },
+    "/items/{item_id}/keys/commit": {
+      "post": {
+        "description": "Stock an item with the keys a stage holds, by its staged_import id. An item that does not sell keys yet needs enable_key_delivery true (it turns key delivery on for good); without it the answer is 409 confirm_key_delivery and the stage stays usable. The same stage again answers what it did.",
+        "operationId": "commit_key_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitKeys"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyImportAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "nothing_to_stock, or invalid_request (a bundle, say)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "confirm_key_delivery (the stage stays usable: commit again with enable_key_delivery), confirmation_invalid (unknown, expired, used, or for another item), or changed (the item changed since)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Commit Key Import"
+      }
+    },
+    "/items/{item_id}/keys/release": {
+      "post": {
+        "description": "End the holds unpaid checkouts have on an item's licence keys, in two calls: without confirmation the answer (202) is the holds now and a confirmation id; send that id back once the user agrees. The confirmation is for the item, not the count: the result has the real count. No holds answers noop.",
+        "operationId": "release_key_holds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Confirm"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldsReleaseAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldsReleaseAnswer"
+                }
+              }
+            },
+            "description": "confirmation_required: the effect, and a confirmation id to send back once the user agrees."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Release Key Holds"
+      }
+    },
+    "/items/{item_id}/keys/stage": {
+      "post": {
+        "description": "Check licence keys for an item without stocking them: one key per line, at most 1,000 keys and 60,000 characters. The answer has the counts (never a key) and a staged_import id that commit_key_import takes, for 15 minutes, so the keys cross the wire once. Each call makes a new stage, at most 5 open per token. Keys sent through an AI conversation reach the AI provider: for a sensitive batch, use the SDK, or send the bot /addkeys with a file.",
+        "operationId": "stage_key_import",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StageKeys"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyStageAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "no_keys, too_many_keys (more than 1,000), nothing_to_stock, or invalid_request (a bundle, say)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "request_too_large: a body over 64 KiB."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited (5 stages open, or the write budget) or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Stage Key Import"
+      }
+    },
+    "/items/{item_id}/keys/void": {
+      "post": {
+        "description": "Withdraw an item's unsold licence keys for good, in two calls: without confirmation the answer (202) is how many and a confirmation id; send that id back once the user agrees. If a sale or an import changes the unsold keys first, nothing is withdrawn and the answer is 409 changed with a fresh preview.",
+        "operationId": "void_keys",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Confirm"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysVoidAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysVoidAnswer"
+                }
+              }
+            },
+            "description": "confirmation_required: the effect, and a confirmation id to send back once the user agrees."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Void Keys"
+      }
+    },
     "/items/{item_id}/move": {
       "post": {
         "description": "Move an item to a new place among its category's items.",
@@ -4996,6 +6346,103 @@
           }
         ],
         "summary": "Move Item"
+      }
+    },
+    "/items/{item_id}/stock": {
+      "get": {
+        "description": "One item's licence-key stock: its counts, how many unsold keys a void would withdraw, and the holds of unpaid checkouts a release would end. Key text is never returned.",
+        "operationId": "get_item_stock",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such item."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Get Item Stock"
       }
     },
     "/orders": {

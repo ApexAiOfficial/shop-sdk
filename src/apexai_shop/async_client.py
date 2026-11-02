@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime
 from typing import (
     Any,
@@ -10,6 +11,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    List,
     Mapping,
     Optional,
     Set,
@@ -22,6 +24,7 @@ import httpx
 from pydantic import BaseModel
 
 from . import _core
+from . import _keys
 from .errors import ConnectionError, ShopError
 from .models import (
     Attention,
@@ -36,6 +39,8 @@ from .models import (
     Coupon,
     CouponAnswer,
     CouponPage,
+    HoldsReleaseAnswer,
+    HoldsReleased,
     ItemAnswer,
     ItemDeleteAnswer,
     ItemDeleted,
@@ -44,18 +49,27 @@ from .models import (
     ItemMoved,
     ItemPage,
     ItemSummary,
+    KeyImport,
+    KeyImportAnswer,
+    KeyImportBatch,
+    KeyImportSummary,
+    KeyStage,
+    KeyStageAnswer,
+    KeysVoidAnswer,
+    KeysVoided,
     OpenReceipt,
     OrderDetail,
     OrderPage,
     OrderSummary,
     PaymentPage,
     SalesSummary,
+    StockDetail,
     StockLevel,
     StockPage,
     StoreResponse,
     WriteAnswer,
 )
-from .results import AsyncConfirmationRequired, WriteResult
+from .results import AsyncConfirmationRequired, Completed, WriteResult
 
 __all__ = ["AsyncShop"]
 
@@ -160,12 +174,12 @@ class AsyncShop:
         body: Optional[Mapping[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Any]:
-        """One logical write: one ``Idempotency-Key``, reused by every retry.
+        """One logical write, with one key reused by every retry when supported.
 
-        Every :class:`ShopError` it raises carries that key as
-        ``idempotency_key``, so the caller can repeat the call safely.
+        Every :class:`ShopError` from an idempotent operation carries that key
+        as ``idempotency_key``, so the caller can repeat the call safely.
         """
-        key = _core.idempotency_key(idempotency_key)
+        key = _core.write_key(operation_id, idempotency_key)
         fixed_path: Dict[str, Any] = dict(path_params or {})
         fixed_body: Dict[str, Any] = dict(body or {})
 
@@ -211,6 +225,7 @@ class AsyncShop:
         )
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
+        retryable = not write or idempotency_key is not None
         attempt = 0
         answer_lost = False  # an earlier attempt may have reached the server
         while True:
@@ -219,7 +234,7 @@ class AsyncShop:
                     method, url, params=params, json=json_body, headers=headers
                 )
             except httpx.RequestError as exc:  # transport errors, and answers that cannot be decoded
-                if attempt < self._max_retries:
+                if retryable and attempt < self._max_retries:
                     answer_lost = answer_lost or _core.may_have_arrived(exc)
                     await self._sleep(_core.backoff(attempt))
                     attempt += 1
@@ -228,7 +243,7 @@ class AsyncShop:
             if response.status_code < 400:
                 return response
             delay = _core.retry_delay(response, attempt, write=write)
-            if delay is not None and attempt < self._max_retries:
+            if retryable and delay is not None and attempt < self._max_retries:
                 answer_lost = answer_lost or _core.may_have_arrived(response)
                 await self._sleep(delay)
                 attempt += 1
@@ -565,6 +580,140 @@ class AsyncStock(_AsyncResource):
     def iter(self, *, limit: Optional[int] = None) -> AsyncIterator[StockLevel]:
         """Stock for every key-selling item, following ``next_cursor``."""
         return self._shop._paginate("list_stock", StockPage, {"limit": limit})
+
+    async def item(self, item_id: int) -> StockDetail:
+        """One item's key counts, checkout holds and voidable stock."""
+        return await self._shop._call(
+            "get_item_stock", StockDetail, path_params={"item_id": item_id}
+        )
+
+    async def stage(
+        self,
+        item_id: int,
+        keys_text: str,
+    ) -> WriteResult[KeyStage]:
+        """Check one batch without stocking it; the result contains counts, never keys."""
+        try:
+            return await self._shop._write(
+                "stage_key_import",
+                KeyStageAnswer,
+                path_params={"item_id": item_id},
+                body={"keys_text": keys_text},
+            )
+        except ShopError as exc:
+            _keys.redact_stage_error(exc)
+            raise
+
+    async def commit(
+        self,
+        item_id: int,
+        staged_import: str,
+        *,
+        enable_key_delivery: bool = False,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[KeyImport]:
+        """Stock a staged batch, sending no keys a second time."""
+        return await self._shop._write(
+            "commit_key_import",
+            KeyImportAnswer,
+            path_params={"item_id": item_id},
+            body={
+                "staged_import": staged_import,
+                "enable_key_delivery": enable_key_delivery,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    async def void(
+        self,
+        item_id: int,
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[KeysVoided]:
+        """Withdraw every unsold key permanently, with a two-step preview."""
+        return await self._shop._write(
+            "void_keys",
+            KeysVoidAnswer,
+            path_params={"item_id": item_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    async def release(
+        self,
+        item_id: int,
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[HoldsReleased]:
+        """End unpaid-checkout key holds, with a two-step preview."""
+        return await self._shop._write(
+            "release_key_holds",
+            HoldsReleaseAnswer,
+            path_params={"item_id": item_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    async def import_keys(
+        self,
+        item_id: int,
+        *,
+        text: Optional[str] = None,
+        path: Optional[Union[str, os.PathLike[str]]] = None,
+        enable_key_delivery: bool = False,
+    ) -> KeyImportSummary:
+        """Stage and commit a string or UTF-8 file in safe, sequential batches."""
+        batch_results: List[KeyImportBatch] = []
+        for number, keys_text in enumerate(
+            _keys.batches(_keys.key_text(text=text, path=path)), start=1
+        ):
+            try:
+                staged = await self.stage(item_id, keys_text)
+                if not isinstance(staged, Completed):
+                    raise ShopError(
+                        None,
+                        "import_not_completed",
+                        "The store did not complete the licence-key staging request.",
+                    )
+                committed = await self.commit(
+                    item_id,
+                    staged.result.staged_import.id,
+                    enable_key_delivery=enable_key_delivery,
+                )
+                if not isinstance(committed, Completed):
+                    raise ShopError(
+                        None,
+                        "import_not_completed",
+                        "The store did not complete the licence-key commit request.",
+                    )
+            except ShopError as exc:
+                _keys.add_import_progress(exc, len(batch_results))
+                raise
+            batch_results.append(
+                KeyImportBatch(
+                    batch=number,
+                    keys=staged.result.keys,
+                    added=committed.result.added,
+                    duplicates=committed.result.duplicates,
+                    too_long=committed.result.too_long,
+                    available=committed.result.available,
+                    turned_on_key_delivery=committed.result.turned_on_key_delivery,
+                )
+            )
+        return KeyImportSummary(
+            item_id=item_id,
+            batches=batch_results,
+            total_keys=sum(batch.keys for batch in batch_results),
+            total_added=sum(batch.added for batch in batch_results),
+            total_duplicates=sum(batch.duplicates for batch in batch_results),
+            total_too_long=sum(batch.too_long for batch in batch_results),
+            available=batch_results[-1].available,
+            turned_on_key_delivery=any(
+                batch.turned_on_key_delivery for batch in batch_results
+            ),
+        )
 
 
 class AsyncOrders(_AsyncResource):

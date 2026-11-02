@@ -2,14 +2,28 @@
 
 from __future__ import annotations
 
+import os
 import time
 from datetime import datetime
-from typing import Any, Callable, Dict, Iterator, Mapping, Optional, Set, Type, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import httpx
 from pydantic import BaseModel
 
 from . import _core
+from . import _keys
 from .errors import ConnectionError, ShopError
 from .models import (
     Attention,
@@ -24,6 +38,8 @@ from .models import (
     Coupon,
     CouponAnswer,
     CouponPage,
+    HoldsReleaseAnswer,
+    HoldsReleased,
     ItemAnswer,
     ItemDeleteAnswer,
     ItemDeleted,
@@ -32,18 +48,27 @@ from .models import (
     ItemMoved,
     ItemPage,
     ItemSummary,
+    KeyImport,
+    KeyImportAnswer,
+    KeyImportBatch,
+    KeyImportSummary,
+    KeyStage,
+    KeyStageAnswer,
+    KeysVoidAnswer,
+    KeysVoided,
     OpenReceipt,
     OrderDetail,
     OrderPage,
     OrderSummary,
     PaymentPage,
     SalesSummary,
+    StockDetail,
     StockLevel,
     StockPage,
     StoreResponse,
     WriteAnswer,
 )
-from .results import ConfirmationRequired, WriteResult
+from .results import Completed, ConfirmationRequired, WriteResult
 
 __all__ = ["Shop"]
 
@@ -57,13 +82,16 @@ class Shop:
     ``base_url`` is the API address the store's bot showed with the token, for
     example ``https://your-store.example/api/merchant/v1/``; it defaults to the
     ``SHOP_API_URL`` environment variable. ``token`` defaults to
-    ``SHOP_API_TOKEN``. Calls are retried up to ``max_retries`` times on 429,
-    502, 503, 504 and transport errors. Writes carry an ``Idempotency-Key``
-    that stays the same across their retries, so a retry never changes the
-    store twice; they are also retried on 409 ``idempotency_in_progress``,
-    never on 429 ``daily_cap``, and not when Retry-After exceeds 30 seconds.
-    Every error a write raises carries its ``idempotency_key``, to repeat the
-    same call safely when the error does not say whether the change was made.
+    ``SHOP_API_TOKEN``. Reads and idempotent writes are retried up to
+    ``max_retries`` times on 429, 502, 503, 504 and transport errors. Those
+    writes carry an ``Idempotency-Key`` that stays the same across retries, so
+    a retry never changes the store twice; they are also retried on 409
+    ``idempotency_in_progress``, never on 429 ``daily_cap``, and not when
+    Retry-After exceeds 30 seconds.
+    Every error from an idempotent write carries its ``idempotency_key``, to
+    repeat the same call safely when the error does not say whether the change
+    was made. Key staging is the contract's exception: it is not retried after
+    an ambiguous failure, so it cannot create duplicate open stages.
 
     Pass ``http_client`` to reuse your own :class:`httpx.Client` (its timeout
     and transport are kept, and :meth:`close` leaves it open).
@@ -149,12 +177,12 @@ class Shop:
         body: Optional[Mapping[str, Any]] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Any]:
-        """One logical write: one ``Idempotency-Key``, reused by every retry.
+        """One logical write, with one key reused by every retry when supported.
 
-        Every :class:`ShopError` it raises carries that key as
-        ``idempotency_key``, so the caller can repeat the call safely.
+        Every :class:`ShopError` from an idempotent operation carries that key
+        as ``idempotency_key``, so the caller can repeat the call safely.
         """
-        key = _core.idempotency_key(idempotency_key)
+        key = _core.write_key(operation_id, idempotency_key)
         fixed_path: Dict[str, Any] = dict(path_params or {})
         fixed_body: Dict[str, Any] = dict(body or {})
 
@@ -199,6 +227,7 @@ class Shop:
         )
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
+        retryable = not write or idempotency_key is not None
         attempt = 0
         answer_lost = False  # an earlier attempt may have reached the server
         while True:
@@ -207,7 +236,7 @@ class Shop:
                     method, url, params=params, json=json_body, headers=headers
                 )
             except httpx.RequestError as exc:  # transport errors, and answers that cannot be decoded
-                if attempt < self._max_retries:
+                if retryable and attempt < self._max_retries:
                     answer_lost = answer_lost or _core.may_have_arrived(exc)
                     self._sleep(_core.backoff(attempt))
                     attempt += 1
@@ -216,7 +245,7 @@ class Shop:
             if response.status_code < 400:
                 return response
             delay = _core.retry_delay(response, attempt, write=write)
-            if delay is not None and attempt < self._max_retries:
+            if retryable and delay is not None and attempt < self._max_retries:
                 answer_lost = answer_lost or _core.may_have_arrived(response)
                 self._sleep(delay)
                 attempt += 1
@@ -565,6 +594,156 @@ class Stock(_Resource):
     def iter(self, *, limit: Optional[int] = None) -> Iterator[StockLevel]:
         """Stock for every key-selling item, following ``next_cursor``."""
         return self._shop._paginate("list_stock", StockPage, {"limit": limit})
+
+    def item(self, item_id: int) -> StockDetail:
+        """One item's key counts, checkout holds and voidable stock.
+
+        Key text is never returned. Needs ``inventory:read``.
+        """
+        return self._shop._call(
+            "get_item_stock", StockDetail, path_params={"item_id": item_id}
+        )
+
+    def stage(
+        self,
+        item_id: int,
+        keys_text: str,
+    ) -> WriteResult[KeyStage]:
+        """Check one batch without stocking it; the result contains counts, never keys.
+
+        ``keys_text`` is one key per line, at most 1,000 keys and 60,000
+        characters. Needs ``inventory:write``.
+        """
+        try:
+            return self._shop._write(
+                "stage_key_import",
+                KeyStageAnswer,
+                path_params={"item_id": item_id},
+                body={"keys_text": keys_text},
+            )
+        except ShopError as exc:
+            _keys.redact_stage_error(exc)
+            raise
+
+    def commit(
+        self,
+        item_id: int,
+        staged_import: str,
+        *,
+        enable_key_delivery: bool = False,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[KeyImport]:
+        """Stock a staged batch, sending no keys a second time.
+
+        A :class:`~apexai_shop.ConfirmKeyDeliveryError` leaves the stage
+        usable. Pass ``enable_key_delivery=True`` only with the merchant's
+        explicit agreement. Needs ``inventory:write``.
+        """
+        return self._shop._write(
+            "commit_key_import",
+            KeyImportAnswer,
+            path_params={"item_id": item_id},
+            body={
+                "staged_import": staged_import,
+                "enable_key_delivery": enable_key_delivery,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    def void(
+        self,
+        item_id: int,
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[KeysVoided]:
+        """Withdraw every unsold key permanently, with a two-step preview."""
+        return self._shop._write(
+            "void_keys",
+            KeysVoidAnswer,
+            path_params={"item_id": item_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    def release(
+        self,
+        item_id: int,
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[HoldsReleased]:
+        """End unpaid-checkout key holds, with a two-step preview."""
+        return self._shop._write(
+            "release_key_holds",
+            HoldsReleaseAnswer,
+            path_params={"item_id": item_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    def import_keys(
+        self,
+        item_id: int,
+        *,
+        text: Optional[str] = None,
+        path: Optional[Union[str, os.PathLike[str]]] = None,
+        enable_key_delivery: bool = False,
+    ) -> KeyImportSummary:
+        """Stage and commit a string or UTF-8 file in safe, sequential batches.
+
+        Pass exactly one of ``text=`` or ``path=``. A refusal stops before the
+        next batch and reports ``batches_committed`` on the exception.
+        """
+        batch_results: List[KeyImportBatch] = []
+        for number, keys_text in enumerate(
+            _keys.batches(_keys.key_text(text=text, path=path)), start=1
+        ):
+            try:
+                staged = self.stage(item_id, keys_text)
+                if not isinstance(staged, Completed):
+                    raise ShopError(
+                        None,
+                        "import_not_completed",
+                        "The store did not complete the licence-key staging request.",
+                    )
+                committed = self.commit(
+                    item_id,
+                    staged.result.staged_import.id,
+                    enable_key_delivery=enable_key_delivery,
+                )
+                if not isinstance(committed, Completed):
+                    raise ShopError(
+                        None,
+                        "import_not_completed",
+                        "The store did not complete the licence-key commit request.",
+                    )
+            except ShopError as exc:
+                _keys.add_import_progress(exc, len(batch_results))
+                raise
+            batch_results.append(
+                KeyImportBatch(
+                    batch=number,
+                    keys=staged.result.keys,
+                    added=committed.result.added,
+                    duplicates=committed.result.duplicates,
+                    too_long=committed.result.too_long,
+                    available=committed.result.available,
+                    turned_on_key_delivery=committed.result.turned_on_key_delivery,
+                )
+            )
+        return KeyImportSummary(
+            item_id=item_id,
+            batches=batch_results,
+            total_keys=sum(batch.keys for batch in batch_results),
+            total_added=sum(batch.added for batch in batch_results),
+            total_duplicates=sum(batch.duplicates for batch in batch_results),
+            total_too_long=sum(batch.too_long for batch in batch_results),
+            available=batch_results[-1].available,
+            turned_on_key_delivery=any(
+                batch.turned_on_key_delivery for batch in batch_results
+            ),
+        )
 
 
 class Orders(_Resource):

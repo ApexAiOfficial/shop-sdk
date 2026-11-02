@@ -11,7 +11,7 @@ Refused writes add a few classes keyed on their stable codes:
 :class:`DailyCapError` (429 ``daily_cap``), :class:`ApprovalRequiredError` and
 :class:`WritesDisabledError` (403).
 
-Every error a write raises carries that call's ``idempotency_key``. A
+Every error from an idempotent write carries that call's ``idempotency_key``. A
 :class:`ConnectionError`, a :class:`ServerError` or an ``invalid_response``
 does not say whether the change was made: repeat the same call with
 ``idempotency_key=err.idempotency_key`` and the API answers the stored result
@@ -34,6 +34,7 @@ __all__ = [
     "NotFoundError",
     "BadRequestError",
     "ConflictError",
+    "ConfirmKeyDeliveryError",
     "ChangedError",
     "ConfirmationInvalidError",
     "StoreSuspendedError",
@@ -48,10 +49,12 @@ class ShopError(Exception):
     """Base class for every error raised by the client.
 
     ``idempotency_key`` is the ``Idempotency-Key`` the failed write sent
-    (``None`` for reads): pass it to the same call to retry it safely.
+    (``None`` for reads and non-idempotent staging): pass it to the same call
+    to retry it safely.
     """
 
     idempotency_key: Optional[str] = None
+    batches_committed: Optional[int] = None
 
     def __init__(
         self,
@@ -71,13 +74,21 @@ class ShopError(Exception):
         text = f"{head}: {self.message}"
         if self.request_id:
             text += f" (request id {self.request_id})"
+        if self.batches_committed is not None:
+            text += (
+                f" [licence-key import stopped after {self.batches_committed} "
+                "committed batch(es)]"
+            )
         return text
 
     def __repr__(self) -> str:
-        return (
+        text = (
             f"{type(self).__name__}(status={self.status!r}, code={self.code!r}, "
-            f"message={self.message!r}, request_id={self.request_id!r})"
+            f"message={self.message!r}, request_id={self.request_id!r}"
         )
+        if self.batches_committed is not None:
+            text += f", batches_committed={self.batches_committed!r}"
+        return text + ")"
 
 
 class AuthenticationError(ShopError):
@@ -204,6 +215,15 @@ class ConfirmationInvalidError(ConflictError):
 
     This call changed nothing. Call the operation again without a
     confirmation for a new preview, and show the user its effect.
+    """
+
+
+class ConfirmKeyDeliveryError(ConflictError):
+    """409 ``confirm_key_delivery``: importing would permanently turn on key delivery.
+
+    The staged import remains usable. Call :meth:`stock.commit` again with
+    ``enable_key_delivery=True`` only after the merchant explicitly agrees;
+    :meth:`stock.import_keys` takes the same opt-in flag.
     """
 
 

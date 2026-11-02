@@ -140,6 +140,16 @@ SAMPLES: Dict[str, Any] = {
         ],
         "next_cursor": None,
     },
+    "get_item_stock": {
+        "item_id": 10,
+        "title": "Guide",
+        "sells_keys": True,
+        "levels": {"available": 5, "reserved": 0, "sold": 2, "revoked": 0, "void": 0},
+        "voidable": 5,
+        "holds": {"live": 0, "lapsed": 0},
+        "low_stock_threshold": 3,
+        "low": False,
+    },
     "list_orders": {
         "data": [
             {
@@ -224,6 +234,40 @@ SAMPLES: Dict[str, Any] = {
     ),
     "create_coupon": answer(result=COUPON),
     "update_coupon": answer(result=dict(COUPON, is_active=False)),
+    "stage_key_import": answer(
+        result={
+            "item_id": 10,
+            "staged_import": {
+                "id": "stage_abc123",
+                "expires_at": "2026-11-02T12:15:00Z",
+            },
+            "keys": 2,
+            "would_add": 2,
+            "duplicates": 0,
+            "too_long": 0,
+            "available_now": 5,
+            "available_after": 7,
+            "turns_on_key_delivery": False,
+            "members_only": False,
+            "comma_lines": 0,
+            "hidden": False,
+        }
+    ),
+    "commit_key_import": answer(
+        result={
+            "item_id": 10,
+            "added": 2,
+            "duplicates": 0,
+            "too_long": 0,
+            "available": 7,
+            "members_only": False,
+            "turned_on_key_delivery": False,
+        }
+    ),
+    "void_keys": answer(result={"item_id": 10, "voided": 5}),
+    "release_key_holds": answer(
+        result={"item_id": 10, "released": 2, "unheld": 7, "until": "2026-11-02T12:05:00Z"}
+    ),
 }
 SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
 SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
@@ -236,6 +280,7 @@ ROUTES = {
     ("GET", "/items"): "list_items",
     ("GET", "/items/10"): "get_item",
     ("GET", "/stock"): "list_stock",
+    ("GET", "/items/10/stock"): "get_item_stock",
     ("GET", "/orders"): "list_orders",
     ("GET", "/orders/100"): "get_order",
     ("GET", "/payments"): "list_payments",
@@ -251,6 +296,10 @@ ROUTES = {
     ("POST", "/items/10/delete"): "delete_item",
     ("POST", "/coupons"): "create_coupon",
     ("PATCH", "/coupons/SPRING10"): "update_coupon",
+    ("POST", "/items/10/keys/stage"): "stage_key_import",
+    ("POST", "/items/10/keys/commit"): "commit_key_import",
+    ("POST", "/items/10/keys/void"): "void_keys",
+    ("POST", "/items/10/keys/release"): "release_key_holds",
 }
 
 PREFIX = "/api/merchant/v1"

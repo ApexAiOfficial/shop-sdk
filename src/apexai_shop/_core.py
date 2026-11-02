@@ -21,6 +21,7 @@ from .errors import (
     BadRequestError,
     ChangedError,
     ConfirmationInvalidError,
+    ConfirmKeyDeliveryError,
     ConflictError,
     DailyCapError,
     NotFoundError,
@@ -43,7 +44,7 @@ BACKOFF = (0.5, 1.0, 2.0)
 #: The longest Retry-After the client will sleep for.
 MAX_RETRY_AFTER = 30.0
 RETRY_STATUSES = frozenset({502, 503, 504})
-#: The header every write carries, and the pattern its value must match.
+#: The header idempotent writes carry, and the pattern its value must match.
 IDEMPOTENCY_HEADER = "Idempotency-Key"
 IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 #: 409 codes a write retries (with the same key): an identical request is still running.
@@ -167,6 +168,15 @@ def idempotency_key(key: Optional[str] = None) -> str:
     return key
 
 
+def write_key(operation_id: str, key: Optional[str]) -> Optional[str]:
+    """Validate/generate a key exactly when the operation contract declares one."""
+    if OPERATIONS[operation_id].uses_idempotency_key:
+        return idempotency_key(key)
+    if key is not None:
+        raise TypeError(f"{operation_id} does not take idempotency_key")
+    return None
+
+
 def request_headers(base: Mapping[str, str], key: Optional[str]) -> Dict[str, str]:
     """``base`` plus the ``Idempotency-Key`` header when ``key`` is set (writes)."""
     headers = dict(base)
@@ -227,8 +237,8 @@ def retry_delay(response: httpx.Response, attempt: int, *, write: bool = False) 
     """How long to wait before retrying ``response``, or None if it is final.
 
     Reads retry 429 (Retry-After, capped at :data:`MAX_RETRY_AFTER`) and
-    502/503/504 (backoff). Writes, which repeat the same ``Idempotency-Key``,
-    see :func:`write_retry_delay`.
+    502/503/504 (backoff). Idempotent writes repeat the same
+    ``Idempotency-Key`` and use :func:`write_retry_delay`.
     """
     if write:
         return write_retry_delay(response, attempt)
@@ -246,7 +256,7 @@ def retry_delay(response: httpx.Response, attempt: int, *, write: bool = False) 
 def write_retry_delay(response: httpx.Response, attempt: int) -> Optional[float]:
     """How long to wait before retrying a write's ``response``, or None if it is final.
 
-    A write is retried with the same ``Idempotency-Key`` on 409
+    An idempotent write is retried with the same ``Idempotency-Key`` on 409
     ``idempotency_in_progress`` (the same request is still running), on 429
     other than ``daily_cap``, and on 502/503/504 (including 503 ``busy``). The
     wait is the server's Retry-After, or the backoff when there is none; if
@@ -355,6 +365,12 @@ def error_from_response(
             if answer_lost:
                 message = f"{message} {LOST_ANSWER_NOTE}"
             return ConfirmationInvalidError(status, code, message, request_id)
+        if code == "confirm_key_delivery":
+            message = (
+                f"{message} Pass enable_key_delivery=True only after the merchant "
+                "agrees to turn on key delivery permanently."
+            )
+            return ConfirmKeyDeliveryError(status, code, message, request_id)
         current = body.get("current")
         return ConflictError(
             status, code, message, request_id, current=current if isinstance(current, dict) else None

@@ -1,10 +1,11 @@
 """Response models for the Shop Bot merchant API, contract version 1.
 
-Every model mirrors one schema of ``contract/merchant-api-v1.json``. Models
-ignore fields they do not know, so an additive server change never breaks an
-existing client. Values the contract lists as enums are typed as ``str`` for
-the same reason: a new status or tier arrives as a plain string instead of a
-validation error. Amounts are whole Telegram Stars.
+Wire models mirror schemas in ``contract/merchant-api-v1.json``; the import
+helper's two aggregate models are SDK-only. Models ignore fields they do not
+know, so an additive server change never breaks an existing client. Values the
+contract lists as enums are typed as ``str`` for the same reason: a new status
+or tier arrives as a plain string instead of a validation error. Amounts are
+whole Telegram Stars.
 
 Writes answer an envelope (:class:`WriteAnswer` and its per-operation
 subclasses such as :class:`CategoryAnswer`); the client turns it into a
@@ -36,6 +37,8 @@ __all__ = [
     "CouponPage",
     "CouponUses",
     "Effect",
+    "HoldsReleaseAnswer",
+    "HoldsReleased",
     "ItemAnswer",
     "ItemBundle",
     "ItemDeleteAnswer",
@@ -49,6 +52,14 @@ __all__ = [
     "ItemSummary",
     "ItemVariant",
     "KeyCounts",
+    "KeyImport",
+    "KeyImportAnswer",
+    "KeyImportBatch",
+    "KeyImportSummary",
+    "KeyStage",
+    "KeyStageAnswer",
+    "KeysVoidAnswer",
+    "KeysVoided",
     "OpenReceipt",
     "OrderDetail",
     "OrderGrant",
@@ -62,8 +73,12 @@ __all__ = [
     "RefundRequest",
     "Sales",
     "SalesSummary",
+    "StockCounts",
+    "StockDetail",
+    "StockHolds",
     "StockLevel",
     "StockPage",
+    "StagedImport",
     "StoreInfo",
     "StoreResponse",
     "TokenInfo",
@@ -247,6 +262,30 @@ class StockLevel(_Model):
 class StockPage(_Model):
     data: List[StockLevel]
     next_cursor: Optional[str]
+
+
+class StockCounts(_Model):
+    available: int
+    reserved: int
+    sold: int
+    revoked: int
+    void: int
+
+
+class StockHolds(_Model):
+    live: int
+    lapsed: int
+
+
+class StockDetail(_Model):
+    item_id: int
+    title: str
+    sells_keys: bool
+    levels: StockCounts
+    voidable: int
+    holds: StockHolds
+    low_stock_threshold: int
+    low: bool
 
 
 # --- orders ----------------------------------------------------------------
@@ -493,3 +532,89 @@ class ItemDeleteAnswer(WriteAnswer):
 
 class CouponAnswer(WriteAnswer):
     result: Optional[Coupon]  # type: ignore[assignment]
+
+
+# --- licence-key writes ----------------------------------------------------
+
+
+class StagedImport(_Model):
+    id: str = Field(repr=False)
+    expires_at: datetime
+
+
+class KeyStage(_Model):
+    item_id: int
+    staged_import: StagedImport
+    keys: int
+    would_add: int
+    duplicates: int
+    too_long: int
+    available_now: int
+    available_after: int
+    turns_on_key_delivery: bool
+    members_only: bool
+    comma_lines: int
+    hidden: bool
+
+
+class KeyStageAnswer(WriteAnswer):
+    result: Optional[KeyStage]  # type: ignore[assignment]
+
+
+class KeyImport(_Model):
+    item_id: int
+    added: int
+    duplicates: int
+    too_long: int
+    available: int
+    members_only: bool
+    turned_on_key_delivery: bool
+
+
+class KeyImportAnswer(WriteAnswer):
+    result: Optional[KeyImport]  # type: ignore[assignment]
+
+
+class KeysVoided(_Model):
+    item_id: int
+    voided: int
+
+
+class KeysVoidAnswer(WriteAnswer):
+    result: Optional[KeysVoided]  # type: ignore[assignment]
+
+
+class HoldsReleased(_Model):
+    item_id: int
+    released: int
+    unheld: int
+    until: Optional[datetime]
+
+
+class HoldsReleaseAnswer(WriteAnswer):
+    result: Optional[HoldsReleased]  # type: ignore[assignment]
+
+
+class KeyImportBatch(_Model):
+    """Counts for one batch handled by :meth:`stock.import_keys` (never key text)."""
+
+    batch: int
+    keys: int
+    added: int
+    duplicates: int
+    too_long: int
+    available: int
+    turned_on_key_delivery: bool
+
+
+class KeyImportSummary(_Model):
+    """Secret-free aggregate returned after every import batch commits."""
+
+    item_id: int
+    batches: List[KeyImportBatch]
+    total_keys: int
+    total_added: int
+    total_duplicates: int
+    total_too_long: int
+    available: int
+    turned_on_key_delivery: bool

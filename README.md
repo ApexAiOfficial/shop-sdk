@@ -88,6 +88,12 @@ asyncio.run(main())
 | `items.list(q=, category=, status=, limit=, cursor=)` / `items.iter(...)` | `GET /items` | `ItemPage` / `ItemSummary` |
 | `items.get(item_id)` | `GET /items/{item_id}` | `ItemDetail` |
 | `stock.list(limit=, cursor=)` / `stock.iter()` | `GET /stock` | `StockPage` / `StockLevel` |
+| `stock.item(item_id)` | `GET /items/{item_id}/stock` | `StockDetail`: counts, holds and voidable stock, never key text |
+| `stock.stage(item_id, keys_text)` | `POST /items/{item_id}/keys/stage` | `Completed` with `KeyStage` counts and a staged-import id |
+| `stock.commit(item_id, staged_import, enable_key_delivery=)` | `POST /items/{item_id}/keys/commit` | `Completed` with `KeyImport` counts |
+| `stock.import_keys(item_id, text=... or path=..., enable_key_delivery=)` | stage + commit in safe batches | `KeyImportSummary` with per-batch and total counts |
+| `stock.void(item_id, confirmation=)` | `POST /items/{item_id}/keys/void` | `ConfirmationRequired`, then `Completed` with `KeysVoided` |
+| `stock.release(item_id, confirmation=)` | `POST /items/{item_id}/keys/release` | `ConfirmationRequired`, then `Completed` with `HoldsReleased` |
 | `orders.list(status=, since=, until=, buyer=, summary=, cursor=)` / `orders.iter(...)` | `GET /orders` | `OrderPage` / `OrderSummary` |
 | `orders.get(order_id)` | `GET /orders/{order_id}` | `OrderDetail` |
 | `payments.list(cursor=)` / `payments.iter()` | `GET /payments` | `PaymentPage` / `OpenReceipt` |
@@ -128,6 +134,7 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | (any token) | `store()`: the store and the token itself |
 | `catalog:read` | Categories and items (`categories`, `items`) |
 | `inventory:read` | Licence-key stock levels (`stock`) |
+| `inventory:write` | Stage, import, withdraw and release licence-key stock (`stock.stage`, `commit`, `import_keys`, `void`, `release`) |
 | `orders:read` | Orders, order details and open payments (`orders`, `payments`) |
 | `customers:read` | Buyer Telegram user ids in orders, and the `buyer=` filter. Without it, `buyer_tg_user_id` is `None` |
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
@@ -142,8 +149,30 @@ write scopes; `/apitoken` in the private chat lists them. A token minted before 
 store took changes through the API has no write scope: mint a new one for a job that
 changes the store.
 
-Further scopes (for stock and support among them) arrive with the operations that
-need them. Give each token only the scopes the job needs.
+Further scopes arrive with the operations that need them. Give each token only
+the scopes the job needs.
+
+## Importing licence keys
+
+Licence keys are secrets. Keys sent through an AI conversation reach the AI
+provider, so prefer this SDK or the bot's `/addkeys` with a file. The SDK never
+returns key text and keeps it out of result and error representations and logs.
+
+Pass either `text=` (one key per line) or `path=` (a UTF-8 text file), never
+both. `import_keys` splits the input into batches within the API's 1,000-key,
+60,000-character and request-size limits, then stages and commits each batch in
+order:
+
+```python
+with Shop() as shop:
+    imported = shop.stock.import_keys(42, path="licence-keys.txt")
+    print(imported.total_added, imported.total_duplicates)
+```
+
+If a batch is refused, the exception's `batches_committed` says how many prior
+batches completed. Importing the first keys into an item permanently turns on
+key delivery; the store refuses with `ConfirmKeyDeliveryError` unless you
+explicitly pass `enable_key_delivery=True` after agreeing to that change.
 
 ## Changing the store
 
@@ -210,9 +239,9 @@ API refuses with `ChangedError`, whose `preview` is a fresh
 shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
 (`result.answer.model_dump(mode="json")`), id included, to return as data.
 
-**Idempotency.** Every write sends an `Idempotency-Key` header: a random key
-per call, the same on each of the client's own retries. If a retry reaches the
-store after the first attempt already made the change, the API answers with the
+**Idempotency.** Every store-changing write sends an `Idempotency-Key` header:
+a random key per call, the same on each of the client's own retries. If a retry
+reaches the store after the first attempt already made the change, the API answers with the
 stored result (`replayed` is true) instead of changing the store twice. Keys are
 kept for 24 hours; the same key with a different body is refused (422
 `idempotency_key_reused`). To retry safely across processes or restarts, pass
@@ -222,10 +251,14 @@ your own key, 16 to 64 letters, digits, `-` or `_`:
 shop.categories.create("Guides", idempotency_key="import-2026-11-02-guides")
 ```
 
+Staging licence-key text is the contract's exception: each stage is new and
+does not take an idempotency key. The SDK does not automatically retry staging
+after an ambiguous failure, avoiding duplicate open stages.
+
 **When a write fails without an answer.** A `ConnectionError`, a `ServerError`
 or an `invalid_response` error on a write does not tell you whether the change
-was made. Every error a write raises carries the call's `idempotency_key`:
-repeat the same call with it, and the API answers the stored result if the
+was made. Every error from an idempotent write carries the call's
+`idempotency_key`: repeat the same call with it, and the API answers the stored result if the
 change was made, or makes it once if it was not. A new call without that key
 is a new change (two `create("Guides")` calls create two categories):
 
@@ -246,7 +279,7 @@ made its change answers the stored result (`replayed`). If it answers
 active=False)` only hides the category). Text you send becomes store content
 that buyers see; check what an AI agent wants to write before it does.
 
-**Retries for writes.** Writes are retried, with the same key, on network
+**Retries for writes.** Idempotent writes are retried, with the same key, on network
 errors, 502/503/504 (503 `busy` means another change holds what this one needs),
 429 other than `daily_cap` (such as `rate_limited`) and 409
 `idempotency_in_progress`. They wait for Retry-After when it is at most 30

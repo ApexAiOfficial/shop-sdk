@@ -188,8 +188,45 @@ retries, and `timeout=` (seconds, default 30) to change the request timeout.
 To reuse your own connection pool, proxies or transport, pass
 `http_client=httpx.Client(...)` (or `httpx.AsyncClient` for `AsyncShop`).
 
+## Webhooks
+
+A Business store can also call your server when something happens: `order.paid`,
+`order.refunded`, `ticket.created`, `stock.low` (and `webhook.test`). The store owner adds
+your HTTPS URL (port 443) in the private chat with the store's bot with `/webhooks`, chooses
+the events, and gets a signing secret (`whsec_...`) once. Buyer details are included only if
+the owner turns them on for that endpoint.
+
+Verify every request before you trust it, with the raw body exactly as received:
+
+```python
+from apexai_shop import WebhookVerificationError, verify_webhook
+
+def handle(raw_body: bytes, headers: dict) -> int:
+    try:
+        event = verify_webhook(raw_body, headers, secret=os.environ["SHOP_WEBHOOK_SECRET"])
+    except WebhookVerificationError:
+        return 400
+    if event.type == "order.paid":
+        record_sale(event.data["order_id"], event.data["total_stars"])
+    return 204
+```
+
+- **The signature:** `Shop-Webhook-Signature: v1=<hex HMAC-SHA256(secret, "<timestamp>.<body>")>`,
+  with `Shop-Webhook-Timestamp` in Unix seconds and `Shop-Webhook-Id` the event id.
+  `verify_webhook` compares in constant time and refuses timestamps more than 5 minutes
+  away (`tolerance=`).
+- **At least once:** the store retries a failed delivery with backoff for 24 hours, so the
+  same event can arrive twice. Use `event.id` to ignore repeats.
+- **Answer fast** with a 2xx status, and do slow work afterwards; the store waits 5 seconds
+  and does not follow redirects.
+- **Rotating the secret** in `/webhooks` replaces it at once; a delivery already on its way
+  may still carry the old signature.
+- The event schemas are in [`contract/merchant-webhooks-v1.json`](contract/merchant-webhooks-v1.json).
+  A complete receiver is in [`examples/webhook_receiver.py`](examples/webhook_receiver.py).
+
 ## Security
 
+- Keep the webhook secret like the token: in an environment variable or a secret manager.
 - Keep the token in an environment variable or a secret manager, never in
   source code, notebooks you share, or logs.
 - The client never logs the token, and `repr(shop)` shows only the base URL.

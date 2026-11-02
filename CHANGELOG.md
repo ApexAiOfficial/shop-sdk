@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-11-02
+
+### Added
+
+- `verify_webhook(body, headers, secret)` for the store's signed webhooks: it checks the
+  `Shop-Webhook-Signature` (`v1=` HMAC-SHA256 over `timestamp.body`, compared in constant
+  time, any of several values may match), refuses timestamps more than 5 minutes away, reads
+  headers without regard to case, and returns a `WebhookEvent`. `WebhookVerificationError`
+  marks anything that is not genuine; `compute_signature` is exposed for tests.
+- `contract/merchant-webhooks-v1.json`: the JSON Schema of every event (`order.paid`,
+  `order.refunded`, `ticket.created`, `stock.low`, `webhook.test`) and tests that keep
+  `WebhookEvent` in step with it.
+- Example: a standard-library webhook receiver (`examples/webhook_receiver.py`).
+
 ## [0.1.0] - 2026-11-01
 
 First release, for merchant API contract version 1.

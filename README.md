@@ -141,13 +141,19 @@ one of three results, each with the API's envelope fields (`status`,
 | --- | --- | --- |
 | `Completed` | `done` (HTTP 200) | The change is made; `result` is the changed object. `noop` is true when nothing needed to change |
 | `ConfirmationRequired` | `confirmation_required` (HTTP 202) | Nothing changed yet. Show the user `effect.summary`, and call `.confirm()` only after they agree |
-| `PendingApproval` | `pending_approval` (HTTP 202) | Nothing changed yet; the store owner must tap Approve in Telegram. Never report it as done |
+| `PendingApproval` | `pending_approval` (HTTP 202) | Nothing changed yet; the change waits for the store owner to tap Approve in Telegram. Never report it as done |
+
+A status newer than this client comes back as a plain `WriteResult` (the base
+class of all three), so check the class before you use `result`:
 
 ```python
 from apexai_shop import Completed, ConfirmationRequired, Shop
 
 with Shop() as shop:
-    guides = shop.categories.create("Guides").result
+    created = shop.categories.create("Guides")
+    if not isinstance(created, Completed):
+        raise SystemExit(f"Not created yet: {created.next}")
+    guides = created.result
     shop.categories.update(guides.id, title="Handbooks")
     shop.categories.move(guides.id, 0)               # first in the list
 
@@ -156,18 +162,38 @@ with Shop() as shop:
         print(preview.effect.summary)                # show the user what will happen
         if input("Delete? [y/N] ") == "y":
             done = preview.confirm()                 # the same call, plus the confirmation
-            assert isinstance(done, Completed)
+            if isinstance(done, Completed):
+                print("deleted", done.result.category_id)
 ```
 
-With `AsyncShop`, `await preview.confirm()`.
+With `AsyncShop`, a preview is an `AsyncConfirmationRequired` (also a
+`ConfirmationRequired`) whose `confirm()` you await:
+
+```python
+from apexai_shop import AsyncConfirmationRequired, AsyncShop, Completed
+
+
+async def delete_category(category_id: int) -> None:
+    async with AsyncShop() as shop:
+        preview = await shop.categories.delete(category_id)
+        if isinstance(preview, AsyncConfirmationRequired):
+            print(preview.effect.summary)
+            done = await preview.confirm()
+            if isinstance(done, Completed):
+                print("deleted", done.result.category_id)
+```
 
 **Confirmations.** A two-step write (deleting a category, for example) answers
 first with a preview: the `effect` and a single-use `confirmation` that expires
 at `confirmation.expires_at` and is only valid for the same operation and
-arguments. `.confirm()` repeats the call with that confirmation (you can also
-pass `confirmation=preview.confirmation.id` yourself). If the effect changed in
-the meantime the API refuses with `ChangedError`, whose `preview` is a fresh
-`ConfirmationRequired` to show and confirm again.
+arguments. `.confirm()` repeats the call with that confirmation through the
+client that made the preview, so call it before the client is closed. To
+confirm later, pass `confirmation=preview.confirmation` (or its `id`) to the
+same method with the same arguments. If the effect changed in the meantime the
+API refuses with `ChangedError`, whose `preview` is a fresh
+`ConfirmationRequired` to show and confirm again. The confirmation id is never
+shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
+(`result.answer.model_dump(mode="json")`), id included, to return as data.
 
 **Idempotency.** Every write sends an `Idempotency-Key` header: a random key
 per call, the same on each of the client's own retries. If a retry reaches the
@@ -181,16 +207,38 @@ your own key, 16 to 64 letters, digits, `-` or `_`:
 shop.categories.create("Guides", idempotency_key="import-2026-11-02-guides")
 ```
 
+**When a write fails without an answer.** A `ConnectionError`, a `ServerError`
+or an `invalid_response` error on a write does not tell you whether the change
+was made. Every error a write raises carries the call's `idempotency_key`:
+repeat the same call with it, and the API answers the stored result if the
+change was made, or makes it once if it was not. A new call without that key
+is a new change (two `create("Guides")` calls create two categories):
+
+```python
+from apexai_shop import ConnectionError, ServerError
+
+try:
+    created = shop.categories.create("Guides")
+except (ConnectionError, ServerError) as exc:
+    created = shop.categories.create("Guides", idempotency_key=exc.idempotency_key)
+```
+
+For a confirmation, call `preview.confirm()` again: a confirmation that already
+made its change answers the stored result (`replayed`). If it answers
+`ConfirmationInvalidError` instead, nothing was changed; ask for a new preview.
+
 **Arguments.** `None` leaves a field as it is (`update(category_id, title=None,
 active=False)` only hides the category). Text you send becomes store content
 that buyers see; check what an AI agent wants to write before it does.
 
 **Retries for writes.** Writes are retried, with the same key, on network
 errors, 502/503/504 (503 `busy` means another change holds what this one needs),
-429 `rate_limited` and 409 `idempotency_in_progress`, waiting for Retry-After
-when it is at most 30 seconds. They are never retried on 429 `daily_cap`: a
-token has a rolling 24-hour allowance of changes, and `DailyCapError.retry_after`
-says when it has room again.
+429 other than `daily_cap` (such as `rate_limited`) and 409
+`idempotency_in_progress`. They wait for Retry-After when it is at most 30
+seconds (a longer one ends the retries and raises the error at once) and, when
+there is no Retry-After, back off 0.5 s, 1 s, 2 s. They are never retried on
+429 `daily_cap`: a token has a rolling 24-hour allowance of changes, and
+`DailyCapError.retry_after` says when it has room again.
 
 ## Pagination
 
@@ -218,24 +266,26 @@ the first page's filters and ignores the others, so send only the cursor.
 
 Every failure raises a subclass of `apexai_shop.ShopError`, which carries
 `status`, `code` (a stable string such as `unauthorized`,
-`insufficient_scope` or `not_found`), `message` and `request_id`.
+`insufficient_scope` or `not_found`), `message` and `request_id`. Errors a
+write raises also carry its `idempotency_key` (see
+[When a write fails without an answer](#changing-the-store)).
 
 | Exception | When |
 | --- | --- |
 | `AuthenticationError` | 401: a missing or unknown token (`unauthorized`), or one the store issued that no longer works: `token_expired`, `token_revoked`, or `token_inactive` (its creator is no longer the store owner) |
 | `PermissionDeniedError` | 403: the token lacks the scope |
-| `ApprovalRequiredError` | 403 `approval_required`: the change needs the owner's approval in Telegram; `reasons` says why (a `PermissionDeniedError`) |
+| `ApprovalRequiredError` | 403 `approval_required`: refused because the change needs the owner's approval; nothing was queued, so ask the owner to make it in the bot; `reasons` says why (a `PermissionDeniedError`). A `PendingApproval` result, by contrast, is queued and waits for the owner's Approve |
 | `WritesDisabledError` | 403 `writes_disabled`: changes through the API are off for this store (a `PermissionDeniedError`) |
 | `NotFoundError` | 404: no such item, order or category |
 | `BadRequestError` | 400 or 422: a parameter was refused (for writes also `nothing_to_change`, `not_empty`, `idempotency_key_reused`); `fields` names the offending parameters |
 | `ConflictError` | 409: the change conflicts with the store as it is now; for `conflict`, `current` holds the current object |
 | `ChangedError` | 409 `changed`: the effect changed since the preview; `preview` is a fresh `ConfirmationRequired` (a `ConflictError`) |
-| `ConfirmationInvalidError` | 409 `confirmation_invalid`: unknown, expired, used, or for other arguments; call again without it (a `ConflictError`) |
+| `ConfirmationInvalidError` | 409 `confirmation_invalid`: unknown, expired, used, or for other arguments; nothing was changed, so call again without it for a new preview (a `ConflictError`) |
 | `StoreSuspendedError` | 423 `store_suspended`: the store is suspended |
 | `RateLimitError` | 429: too many requests; `retry_after` in seconds |
 | `DailyCapError` | 429 `daily_cap`: the token's 24-hour allowance of changes is spent; never retried (a `RateLimitError`) |
-| `ServerError` | 5xx |
-| `ConnectionError` | The API could not be reached (DNS, TLS, timeout, reset) |
+| `ServerError` | 5xx; on a write the change may have been made: repeat the call with `idempotency_key=exc.idempotency_key` |
+| `ConnectionError` | The API could not be reached (DNS, TLS, timeout, reset); on a write, as for `ServerError` |
 
 ```python
 from apexai_shop import BadRequestError, RateLimitError, ShopError
@@ -337,6 +387,7 @@ API version with a new path.
 ```sh
 pip install -e ".[dev]"
 pytest
+mypy          # strict: the package, the examples and the README's write examples
 ```
 
 ## License

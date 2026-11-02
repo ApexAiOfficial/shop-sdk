@@ -12,14 +12,25 @@ Writes, starting with categories. Requires a store whose merchant API takes chan
 - Writes send a JSON body and an `Idempotency-Key` header: a random key per call (or
   your own with `idempotency_key=`), the same on every retry of that call, so a retry
   never changes the store twice.
+- Every error a write raises carries the call's `idempotency_key`. A `ConnectionError`,
+  `ServerError` or `invalid_response` does not say whether the change was made; repeating
+  the same call with that key answers the stored result or makes the change once.
 - Typed write results with the API's envelope fields (`status`, `replayed`, `noop`,
-  `result`, `confirmation`, `approval`, `effect`, `next`) and the `request_id`:
-  `Completed`, `ConfirmationRequired` (with `.confirm()`, which repeats the same call
-  with the confirmation) and `PendingApproval`; `WriteResult` is their base class.
+  `result`, `confirmation`, `approval`, `effect`, `next`), the `request_id`, and the
+  parsed envelope as `answer` (a pydantic model, for `model_dump()`): `Completed`,
+  `ConfirmationRequired` (with `.confirm()`, which repeats the same call with the
+  confirmation) and `PendingApproval`; `WriteResult` is their base class. `AsyncShop`
+  previews are `AsyncConfirmationRequired`, whose `confirm()` is typed as awaitable.
+  `Completed.result` and a preview's `confirmation` and `effect` are never `None`: an
+  answer without them is an `invalid_response` error.
+- `repr()` never shows a confirmation id, `ConfirmationInfo`'s included.
+- A `confirmation_invalid` that follows an attempt whose answer was lost says so: that
+  attempt may have spent the confirmation, and nothing was changed.
 - Category writes on `Shop` and `AsyncShop` (scope `catalog:write`):
   `categories.create(title)`, `categories.update(category_id, title=, active=)`,
   `categories.move(category_id, to_index)` and `categories.delete(category_id,
-  confirmation=)`, a two-step delete.
+  confirmation=)`, a two-step delete; `confirmation=` takes the preview's
+  `confirmation` or its id.
 - Exceptions for refused writes: `ConflictError` (409, with `current`), `ChangedError`
   (409 `changed`, with a fresh bound `preview`), `ConfirmationInvalidError`,
   `StoreSuspendedError` (423), `DailyCapError` (429 `daily_cap`, a `RateLimitError`),
@@ -32,10 +43,14 @@ Writes, starting with categories. Requires a store whose merchant API takes chan
 ### Changed
 
 - The bundled contract (`contract/merchant-api-v1.json`) includes the category writes;
-  the contract tests also check every write's body fields and `Idempotency-Key` header.
+  the contract tests also check every write's body fields and `Idempotency-Key` header,
+  and that every nullable body field is optional (the client leaves out `None`).
+- CI type-checks the package, the examples and the README's write examples with
+  `mypy --strict` (`mypy` joins the `dev` extra).
 - Writes are retried on 409 `idempotency_in_progress`, 429 other than `daily_cap`, 502,
   503 (including `busy`), 504 and network errors, only when Retry-After is at most 30
-  seconds. Retries of reads are unchanged.
+  seconds (backing off 0.5 s, 1 s, 2 s when there is none). Retries of reads are
+  unchanged.
 - 409 responses raise `ConflictError` and 423 responses `StoreSuspendedError` instead
   of a plain `ShopError`.
 

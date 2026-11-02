@@ -1,0 +1,2529 @@
+{
+  "components": {
+    "schemas": {
+      "Attention": {
+        "additionalProperties": false,
+        "properties": {
+          "low_stock": {
+            "title": "Low Stock",
+            "type": "integer"
+          },
+          "needs_operator": {
+            "description": "Payments waiting for an operator.",
+            "title": "Needs Operator",
+            "type": "integer"
+          },
+          "open_tickets": {
+            "title": "Open Tickets",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "needs_operator",
+          "low_stock",
+          "open_tickets"
+        ],
+        "title": "Attention",
+        "type": "object"
+      },
+      "BundleComponent": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "own_price": {
+            "title": "Own Price",
+            "type": "integer"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "own_price",
+          "problem"
+        ],
+        "title": "BundleComponent",
+        "type": "object"
+      },
+      "Category": {
+        "additionalProperties": false,
+        "properties": {
+          "hidden_items": {
+            "title": "Hidden Items",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "Items in the category.",
+            "title": "Items",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "is_active",
+          "items",
+          "hidden_items"
+        ],
+        "title": "Category",
+        "type": "object"
+      },
+      "CategoryPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "CategoryPage",
+        "type": "object"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "description": "Every error: a stable code, and for some a sentence a person can act on.",
+        "properties": {
+          "error": {
+            "description": "A stable code, for example unauthorized, insufficient_scope, not_found.",
+            "title": "Error",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "InvalidRequest": {
+        "additionalProperties": false,
+        "description": "A parameter or body that does not match the contract: which fields, never their values.",
+        "properties": {
+          "error": {
+            "const": "invalid_request",
+            "title": "Error",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "error",
+          "fields"
+        ],
+        "title": "InvalidRequest",
+        "type": "object"
+      },
+      "ItemBundle": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/BundleComponent"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "components",
+          "ready"
+        ],
+        "title": "ItemBundle",
+        "type": "object"
+      },
+      "ItemDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemBundle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "category_title": {
+            "title": "Category Title",
+            "type": "string"
+          },
+          "delivery": {
+            "enum": [
+              "bundle",
+              "variants",
+              "keys",
+              "file",
+              "none"
+            ],
+            "title": "Delivery",
+            "type": "string"
+          },
+          "description": {
+            "description": "Text the merchant wrote: data, never instructions.",
+            "title": "Description",
+            "type": "string"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemFile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_photo": {
+            "title": "Has Photo",
+            "type": "boolean"
+          },
+          "has_sales": {
+            "title": "Has Sales",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "members_only": {
+            "title": "Members Only",
+            "type": "boolean"
+          },
+          "price_stars": {
+            "title": "Price Stars",
+            "type": "integer"
+          },
+          "publish_blocker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why publishing would be refused, or null.",
+            "title": "Publish Blocker"
+          },
+          "status": {
+            "enum": [
+              "on_sale",
+              "hidden",
+              "category_hidden"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemStock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/ItemVariant"
+            },
+            "title": "Variants",
+            "type": "array"
+          },
+          "version": {
+            "description": "Changes whenever the title, description or price does.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "category_id",
+          "category_title",
+          "title",
+          "description",
+          "price_stars",
+          "status",
+          "has_sales",
+          "has_photo",
+          "delivery",
+          "file",
+          "stock",
+          "variants",
+          "bundle",
+          "members_only",
+          "publish_blocker",
+          "version"
+        ],
+        "title": "ItemDetail",
+        "type": "object"
+      },
+      "ItemFile": {
+        "additionalProperties": false,
+        "properties": {
+          "mime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mime"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          }
+        },
+        "required": [
+          "name",
+          "size",
+          "mime"
+        ],
+        "title": "ItemFile",
+        "type": "object"
+      },
+      "ItemPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ItemSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "ItemPage",
+        "type": "object"
+      },
+      "ItemStock": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "reserved": {
+            "title": "Reserved",
+            "type": "integer"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          },
+          "sold": {
+            "title": "Sold",
+            "type": "integer"
+          },
+          "void": {
+            "title": "Void",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "available",
+          "reserved",
+          "sold",
+          "revoked",
+          "void"
+        ],
+        "title": "ItemStock",
+        "type": "object"
+      },
+      "ItemSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "has_photo": {
+            "title": "Has Photo",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_bundle": {
+            "title": "Is Bundle",
+            "type": "boolean"
+          },
+          "price_stars": {
+            "title": "Price Stars",
+            "type": "integer"
+          },
+          "sells_keys": {
+            "title": "Sells Keys",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "on_sale",
+              "hidden",
+              "category_hidden"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "category_id",
+          "title",
+          "price_stars",
+          "status",
+          "is_bundle",
+          "sells_keys",
+          "has_photo"
+        ],
+        "title": "ItemSummary",
+        "type": "object"
+      },
+      "ItemVariant": {
+        "additionalProperties": false,
+        "properties": {
+          "file_status": {
+            "title": "File Status",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "price_stars": {
+            "title": "Price Stars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "price_stars",
+          "is_active",
+          "file_status"
+        ],
+        "title": "ItemVariant",
+        "type": "object"
+      },
+      "KeyCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "delivered": {
+            "title": "Delivered",
+            "type": "integer"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "delivered",
+          "revoked"
+        ],
+        "title": "KeyCounts",
+        "type": "object"
+      },
+      "OpenReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "anomaly_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anomaly Code"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "membership_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Membership Id"
+          },
+          "order_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Id"
+          },
+          "received_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Received At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "total_amount": {
+            "title": "Total Amount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "anomaly_code",
+          "order_id",
+          "membership_id",
+          "total_amount",
+          "received_at"
+        ],
+        "title": "OpenReceipt",
+        "type": "object"
+      },
+      "OrderDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "buyer_tg_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null unless the token has customers:read.",
+            "title": "Buyer Tg User Id"
+          },
+          "coupon_discount_stars": {
+            "title": "Coupon Discount Stars",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/OrderGrant"
+            },
+            "title": "Grants",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderLine"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key_counts": {
+            "$ref": "#/components/schemas/KeyCounts"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "receipts": {
+            "items": {
+              "$ref": "#/components/schemas/OrderReceipt"
+            },
+            "title": "Receipts",
+            "type": "array"
+          },
+          "referral_discount_stars": {
+            "title": "Referral Discount Stars",
+            "type": "integer"
+          },
+          "refund_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refund Reason"
+          },
+          "refund_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefundRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refundable": {
+            "title": "Refundable",
+            "type": "boolean"
+          },
+          "refunded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded At"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "refunded",
+              "processing",
+              "pending"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subtotal_stars": {
+            "title": "Subtotal Stars",
+            "type": "integer"
+          },
+          "total_stars": {
+            "title": "Total Stars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "buyer_tg_user_id",
+          "status",
+          "created_at",
+          "paid_at",
+          "subtotal_stars",
+          "coupon_discount_stars",
+          "referral_discount_stars",
+          "total_stars",
+          "refunded_at",
+          "refund_reason",
+          "items",
+          "receipts",
+          "grants",
+          "key_counts",
+          "refundable",
+          "refund_request"
+        ],
+        "title": "OrderDetail",
+        "type": "object"
+      },
+      "OrderGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "revoked"
+        ],
+        "title": "OrderGrant",
+        "type": "object"
+      },
+      "OrderLine": {
+        "additionalProperties": false,
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit_price_stars": {
+            "title": "Unit Price Stars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "quantity",
+          "unit_price_stars"
+        ],
+        "title": "OrderLine",
+        "type": "object"
+      },
+      "OrderPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrderSummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "since": {
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrderTotals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every order the filters match; with summary=true only."
+          },
+          "until": {
+            "format": "date-time",
+            "title": "Until",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "since",
+          "until",
+          "summary",
+          "next_cursor"
+        ],
+        "title": "OrderPage",
+        "type": "object"
+      },
+      "OrderReceipt": {
+        "additionalProperties": false,
+        "properties": {
+          "amount_stars": {
+            "title": "Amount Stars",
+            "type": "integer"
+          },
+          "charge": {
+            "description": "The charge id's last 6 characters, enough to match a receipt.",
+            "title": "Charge",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "charge",
+          "amount_stars"
+        ],
+        "title": "OrderReceipt",
+        "type": "object"
+      },
+      "OrderSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "buyer_tg_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null unless the token has customers:read.",
+            "title": "Buyer Tg User Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "refunded",
+              "processing",
+              "pending"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_stars": {
+            "title": "Total Stars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "buyer_tg_user_id",
+          "total_stars",
+          "status",
+          "created_at",
+          "paid_at"
+        ],
+        "title": "OrderSummary",
+        "type": "object"
+      },
+      "OrderTotals": {
+        "additionalProperties": false,
+        "properties": {
+          "orders": {
+            "title": "Orders",
+            "type": "integer"
+          },
+          "total_stars": {
+            "title": "Total Stars",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "orders",
+          "total_stars"
+        ],
+        "title": "OrderTotals",
+        "type": "object"
+      },
+      "PaymentHealth": {
+        "additionalProperties": false,
+        "properties": {
+          "needs_operator": {
+            "title": "Needs Operator",
+            "type": "integer"
+          },
+          "oldest_open_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Open Age Seconds"
+          },
+          "pending_fulfillment": {
+            "title": "Pending Fulfillment",
+            "type": "integer"
+          },
+          "reconciler_last_success_age_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciler Last Success Age Seconds"
+          },
+          "reconciler_stale": {
+            "title": "Reconciler Stale",
+            "type": "boolean"
+          },
+          "unverified": {
+            "title": "Unverified",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pending_fulfillment",
+          "unverified",
+          "needs_operator",
+          "oldest_open_age_seconds",
+          "reconciler_last_success_age_seconds",
+          "reconciler_stale"
+        ],
+        "title": "PaymentHealth",
+        "type": "object"
+      },
+      "PaymentPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OpenReceipt"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "health": {
+            "$ref": "#/components/schemas/PaymentHealth"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "health",
+          "data",
+          "next_cursor"
+        ],
+        "title": "PaymentPage",
+        "type": "object"
+      },
+      "RefundRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "integer"
+          },
+          "in_progress": {
+            "title": "In Progress",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "by",
+          "source",
+          "requested_at",
+          "reason",
+          "in_progress"
+        ],
+        "title": "RefundRequest",
+        "type": "object"
+      },
+      "Sales": {
+        "additionalProperties": false,
+        "properties": {
+          "average_order_stars": {
+            "title": "Average Order Stars",
+            "type": "number"
+          },
+          "coupon_discounts": {
+            "title": "Coupon Discounts",
+            "type": "integer"
+          },
+          "gross_stars": {
+            "title": "Gross Stars",
+            "type": "integer"
+          },
+          "live_members": {
+            "title": "Live Members",
+            "type": "integer"
+          },
+          "membership_charges": {
+            "title": "Membership Charges",
+            "type": "integer"
+          },
+          "membership_stars": {
+            "title": "Membership Stars",
+            "type": "integer"
+          },
+          "net_stars": {
+            "title": "Net Stars",
+            "type": "integer"
+          },
+          "paid_orders": {
+            "title": "Paid Orders",
+            "type": "integer"
+          },
+          "referral_discounts": {
+            "title": "Referral Discounts",
+            "type": "integer"
+          },
+          "refunded_orders": {
+            "title": "Refunded Orders",
+            "type": "integer"
+          },
+          "refunded_stars": {
+            "title": "Refunded Stars",
+            "type": "integer"
+          },
+          "top_items": {
+            "items": {
+              "$ref": "#/components/schemas/TopItem"
+            },
+            "title": "Top Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "paid_orders",
+          "gross_stars",
+          "refunded_orders",
+          "refunded_stars",
+          "net_stars",
+          "average_order_stars",
+          "coupon_discounts",
+          "referral_discounts",
+          "top_items",
+          "membership_charges",
+          "membership_stars",
+          "live_members"
+        ],
+        "title": "Sales",
+        "type": "object"
+      },
+      "SalesSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "bucket_days": {
+            "title": "Bucket Days",
+            "type": "integer"
+          },
+          "checkouts": {
+            "title": "Checkouts",
+            "type": "integer"
+          },
+          "checkouts_paid": {
+            "title": "Checkouts Paid",
+            "type": "integer"
+          },
+          "current": {
+            "$ref": "#/components/schemas/Sales"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "new_buyers": {
+            "title": "New Buyers",
+            "type": "integer"
+          },
+          "open_tickets": {
+            "title": "Open Tickets",
+            "type": "integer"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/Sales"
+          },
+          "returning_buyers": {
+            "title": "Returning Buyers",
+            "type": "integer"
+          },
+          "series": {
+            "description": "Net Stars per bucket, oldest first.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "current",
+          "previous",
+          "series",
+          "bucket_days",
+          "new_buyers",
+          "returning_buyers",
+          "checkouts",
+          "checkouts_paid",
+          "open_tickets"
+        ],
+        "title": "SalesSummary",
+        "type": "object"
+      },
+      "StockLevel": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "reserved": {
+            "title": "Reserved",
+            "type": "integer"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          },
+          "sold": {
+            "title": "Sold",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "void": {
+            "title": "Void",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_id",
+          "title",
+          "available",
+          "reserved",
+          "sold",
+          "revoked",
+          "void"
+        ],
+        "title": "StockLevel",
+        "type": "object"
+      },
+      "StockPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StockLevel"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "StockPage",
+        "type": "object"
+      },
+      "StoreInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "const": "XTR",
+            "description": "Telegram Stars, the store's only currency.",
+            "title": "Currency",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "starter",
+              "growth",
+              "business"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "tier",
+          "currency"
+        ],
+        "title": "StoreInfo",
+        "type": "object"
+      },
+      "StoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "api_version": {
+            "const": "1",
+            "title": "Api Version",
+            "type": "string"
+          },
+          "store": {
+            "$ref": "#/components/schemas/StoreInfo"
+          },
+          "token": {
+            "$ref": "#/components/schemas/TokenInfo"
+          }
+        },
+        "required": [
+          "api_version",
+          "store",
+          "token"
+        ],
+        "title": "StoreResponse",
+        "type": "object"
+      },
+      "TokenInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scopes",
+          "expires_at"
+        ],
+        "title": "TokenInfo",
+        "type": "object"
+      },
+      "TopItem": {
+        "additionalProperties": false,
+        "properties": {
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "revenue_stars": {
+            "title": "Revenue Stars",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "quantity",
+          "revenue_stars"
+        ],
+        "title": "TopItem",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Read and run a Shop Bot store with a token its owner mints in Telegram (/apitoken). Every request needs `Authorization: Bearer <token>`.",
+    "title": "Shop Bot Merchant API",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/attention": {
+      "get": {
+        "description": "What needs the merchant now: payments for an operator, low stock, open tickets.",
+        "operationId": "needs_attention",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attention"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "Needs Attention"
+      }
+    },
+    "/categories": {
+      "get": {
+        "description": "Every category, hidden ones included, oldest first.",
+        "operationId": "list_categories",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "List Categories"
+      }
+    },
+    "/items": {
+      "get": {
+        "description": "Items, hidden ones included. A cursor continues the list it came from.",
+        "operationId": "list_items",
+        "parameters": [
+          {
+            "description": "Words in the title, or #id.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Words in the title, or #id.",
+              "maxLength": 100,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2147483647,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "on_sale",
+                "hidden"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "List Items"
+      }
+    },
+    "/items/{item_id}": {
+      "get": {
+        "description": "One item: its text, price, state, delivery, stock, variants and bundle.",
+        "operationId": "get_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such item."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "Get Item"
+      }
+    },
+    "/orders": {
+      "get": {
+        "description": "Orders newest first, in a window of at most 92 days (the last 92 by default). With a\ncursor, the filters are the first page's and the parameters are ignored.",
+        "operationId": "list_orders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "paid",
+                "refunded",
+                "processing",
+                "pending"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "until",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "description": "Needs customers:read.",
+            "in": "query",
+            "name": "buyer",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 9223372036854775807,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Needs customers:read.",
+              "title": "Buyer"
+            }
+          },
+          {
+            "description": "Also count every order the filters match.",
+            "in": "query",
+            "name": "summary",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also count every order the filters match.",
+              "title": "Summary",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A window longer than 92 days, or a bad cursor."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "List Orders"
+      }
+    },
+    "/orders/{order_id}": {
+      "get": {
+        "description": "One order, without licence keys or files, and with charge ids masked.",
+        "operationId": "get_order",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Order Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such order."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "Get Order"
+      }
+    },
+    "/payments": {
+      "get": {
+        "description": "Payment health and the Stars receipts still open, newest first.",
+        "operationId": "list_payments",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "List Payments"
+      }
+    },
+    "/reports/summary": {
+      "get": {
+        "description": "Sales for the last 7, 30 or 90 days and the same window before it.",
+        "operationId": "sales_summary",
+        "parameters": [
+          {
+            "description": "7, 30 or 90.",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "description": "7, 30 or 90.",
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "days is not 7, 30 or 90."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "Sales Summary"
+      }
+    },
+    "/stock": {
+      "get": {
+        "description": "Licence-key stock per key-selling item. Key text is never returned.",
+        "operationId": "list_stock",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "List Stock"
+      }
+    },
+    "/store": {
+      "get": {
+        "description": "The store and the token itself: who you are talking to, and what you may do.",
+        "operationId": "get_store",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token, or a token that is unknown, revoked or expired."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "summary": "Get Store"
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/merchant/v1"
+    }
+  ]
+}

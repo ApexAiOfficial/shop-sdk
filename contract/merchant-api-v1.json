@@ -501,6 +501,218 @@
         "title": "ConfirmationInfo",
         "type": "object"
       },
+      "Coupon": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "max_uses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uses in all; null: no limit.",
+            "title": "Max Uses"
+          },
+          "pct_off": {
+            "description": "Percent off the order.",
+            "title": "Pct Off",
+            "type": "integer"
+          },
+          "per_user_max_uses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uses per buyer; null: no limit.",
+            "title": "Per User Max Uses"
+          },
+          "uses": {
+            "$ref": "#/components/schemas/CouponUses"
+          }
+        },
+        "required": [
+          "code",
+          "pct_off",
+          "is_active",
+          "max_uses",
+          "per_user_max_uses",
+          "expires_at",
+          "created_at",
+          "uses"
+        ],
+        "title": "Coupon",
+        "type": "object"
+      },
+      "CouponAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Coupon"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "CouponAnswer",
+        "type": "object"
+      },
+      "CouponPage": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Coupon"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "data",
+          "next_cursor"
+        ],
+        "title": "CouponPage",
+        "type": "object"
+      },
+      "CouponUses": {
+        "additionalProperties": false,
+        "properties": {
+          "open_checkouts": {
+            "description": "Uses held by checkouts that can still be paid.",
+            "title": "Open Checkouts",
+            "type": "integer"
+          },
+          "paid": {
+            "description": "Uses held by paid orders.",
+            "title": "Paid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "paid",
+          "open_checkouts"
+        ],
+        "title": "CouponUses",
+        "type": "object"
+      },
       "CreateCategory": {
         "additionalProperties": false,
         "properties": {
@@ -515,6 +727,108 @@
           "title"
         ],
         "title": "CreateCategory",
+        "type": "object"
+      },
+      "CreateCoupon": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Letters, digits, - and _; stored upper-cased.",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]{1,32}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In the future, within 366 days; null: never.",
+            "title": "Expires At"
+          },
+          "max_uses": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null: no limit.",
+            "title": "Max Uses"
+          },
+          "pct_off": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Pct Off",
+            "type": "integer"
+          },
+          "per_user_max_uses": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "At most max_uses.",
+            "title": "Per User Max Uses"
+          }
+        },
+        "required": [
+          "code",
+          "pct_off"
+        ],
+        "title": "CreateCoupon",
+        "type": "object"
+      },
+      "CreateItem": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 3500,
+            "title": "Description",
+            "type": "string"
+          },
+          "price_stars": {
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Price Stars",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_id",
+          "title",
+          "price_stars"
+        ],
+        "title": "CreateItem",
         "type": "object"
       },
       "Effect": {
@@ -589,6 +903,94 @@
         "title": "InvalidRequest",
         "type": "object"
       },
+      "ItemAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "ItemAnswer",
+        "type": "object"
+      },
       "ItemBundle": {
         "additionalProperties": false,
         "properties": {
@@ -609,6 +1011,129 @@
           "ready"
         ],
         "title": "ItemBundle",
+        "type": "object"
+      },
+      "ItemDeleteAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemDeleted"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "ItemDeleteAnswer",
+        "type": "object"
+      },
+      "ItemDeleted": {
+        "additionalProperties": false,
+        "properties": {
+          "bundle_ids": {
+            "description": "archived_in_bundles: the bundles that still sell it.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Bundle Ids",
+            "type": "array"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "outcome": {
+            "description": "deleted for good, or archived (hidden and kept) for the orders, keys or bundles that need it.",
+            "enum": [
+              "deleted",
+              "archived",
+              "archived_with_keys",
+              "archived_in_bundles"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "outcome",
+          "bundle_ids"
+        ],
+        "title": "ItemDeleted",
         "type": "object"
       },
       "ItemDetail": {
@@ -784,6 +1309,118 @@
           "mime"
         ],
         "title": "ItemFile",
+        "type": "object"
+      },
+      "ItemMoveAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmationInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Effect"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to do next, for an agent.",
+            "title": "Next"
+          },
+          "noop": {
+            "description": "True when nothing needed to change.",
+            "title": "Noop",
+            "type": "boolean"
+          },
+          "replayed": {
+            "description": "True when this is the stored answer of an earlier identical request.",
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemMoved"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "done",
+              "confirmation_required",
+              "pending_approval"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "replayed",
+          "noop",
+          "result",
+          "confirmation",
+          "approval",
+          "effect",
+          "next"
+        ],
+        "title": "ItemMoveAnswer",
+        "type": "object"
+      },
+      "ItemMoved": {
+        "additionalProperties": false,
+        "properties": {
+          "from_index": {
+            "title": "From Index",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "to_index": {
+            "title": "To Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "from_index",
+          "to_index"
+        ],
+        "title": "ItemMoved",
         "type": "object"
       },
       "ItemPage": {
@@ -971,6 +1608,23 @@
           "to_index"
         ],
         "title": "MoveCategory",
+        "type": "object"
+      },
+      "MoveItem": {
+        "additionalProperties": false,
+        "properties": {
+          "to_index": {
+            "description": "The new place, 0-based; past the end means last.",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "To Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "to_index"
+        ],
+        "title": "MoveItem",
         "type": "object"
       },
       "OpenReceipt": {
@@ -1883,6 +2537,152 @@
         "title": "UpdateCategory",
         "type": "object"
       },
+      "UpdateCoupon": {
+        "additionalProperties": false,
+        "description": "Null (or absent) leaves a term as it is; set at least one. Switching off a used coupon\npreviews first: send the confirmation back once the user agrees.",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "confirmation": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In the future, within 366 days.",
+            "title": "Expires At"
+          },
+          "max_uses": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Uses"
+          },
+          "per_user_max_uses": {
+            "anyOf": [
+              {
+                "maximum": 1000000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per User Max Uses"
+          }
+        },
+        "title": "UpdateCoupon",
+        "type": "object"
+      },
+      "UpdateItem": {
+        "additionalProperties": false,
+        "description": "Null (or absent) leaves a field as it is; set at least one. A title, description or price\nneeds the version get_item returned.",
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "true publishes (400 not_ready while it has nothing to deliver); false hides.",
+            "title": "Active"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 3500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "price_stars": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Needs pricing:write. A cut to under half of the price of the last 24 hours needs the owner's approval.",
+            "title": "Price Stars"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 16,
+                "pattern": "^[0-9a-f]{16}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The item's version when it was read: another version now is 409 conflict, with the current item.",
+            "title": "Version"
+          }
+        },
+        "title": "UpdateItem",
+        "type": "object"
+      },
       "WriteAnswer": {
         "additionalProperties": false,
         "description": "Every write's answer: done (200), or confirmation_required or pending_approval (202).",
@@ -2293,7 +3093,7 @@
                 }
               }
             },
-            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
           },
           "401": {
             "content": {
@@ -2333,7 +3133,7 @@
                 }
               }
             },
-            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
           },
           "422": {
             "content": {
@@ -2449,7 +3249,7 @@
                 }
               }
             },
-            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
           },
           "401": {
             "content": {
@@ -2489,7 +3289,7 @@
                 }
               }
             },
-            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
           },
           "422": {
             "content": {
@@ -2622,7 +3422,7 @@
                 }
               }
             },
-            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
           },
           "401": {
             "content": {
@@ -2662,7 +3462,7 @@
                 }
               }
             },
-            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
           },
           "422": {
             "content": {
@@ -2778,7 +3578,7 @@
                 }
               }
             },
-            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_empty, invalid_request)."
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
           },
           "401": {
             "content": {
@@ -2818,7 +3618,7 @@
                 }
               }
             },
-            "description": "changed (with a fresh preview), confirmation_invalid, conflict, or idempotency_in_progress."
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
           },
           "422": {
             "content": {
@@ -2867,6 +3667,461 @@
           }
         ],
         "summary": "Move Category"
+      }
+    },
+    "/coupons": {
+      "get": {
+        "description": "Coupons by code, with their terms and the uses they hold now. A cursor continues the list it came from.",
+        "operationId": "list_coupons",
+        "parameters": [
+          {
+            "description": "Switched on, off, or both.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "description": "Switched on, off, or both.",
+              "enum": [
+                "all",
+                "active",
+                "inactive"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          },
+          {
+            "description": "One coupon, by its code.",
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]{1,32}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One coupon, by its code.",
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A cursor from another list or edited, or a window out of range."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token lacks the scope this operation needs."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequest"
+                }
+              }
+            },
+            "description": "A parameter does not match the contract."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait for Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "List Coupons"
+      },
+      "post": {
+        "description": "Create an active coupon. 50% off or more, or more than 1,000 or unlimited uses, needs the owner's approval. The same coupon again answers noop; another coupon with the code is 409 already_exists.",
+        "operationId": "create_coupon",
+        "parameters": [
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCoupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Create Coupon"
+      }
+    },
+    "/coupons/{code}": {
+      "patch": {
+        "description": "Switch a coupon on or off, or change its uses, uses per buyer or expiry. Switching off a coupon that was used previews first (202); widening a large active coupon needs the owner's approval.",
+        "operationId": "update_coupon",
+        "parameters": [
+          {
+            "description": "Any case: codes are upper-cased.",
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "description": "Any case: codes are upper-cased.",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]{1,32}$",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCoupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponAnswer"
+                }
+              }
+            },
+            "description": "confirmation_required: the effect, and a confirmation id to send back once the user agrees."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Update Coupon"
       }
     },
     "/items": {
@@ -3018,6 +4273,149 @@
           }
         ],
         "summary": "List Items"
+      },
+      "post": {
+        "description": "Create an item, hidden until it has something to deliver (a file sent to the bot, or licence keys) and is published. Needs pricing:write as well as catalog:write.",
+        "operationId": "create_item",
+        "parameters": [
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Create Item"
       }
     },
     "/items/{item_id}": {
@@ -3115,6 +4513,489 @@
           }
         ],
         "summary": "Get Item"
+      },
+      "patch": {
+        "description": "Edit an item's title, description or price with the version get_item returned, or publish or hide it. A value it already has is not a change: a retry of an edit that went through answers noop.",
+        "operationId": "update_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Update Item"
+      }
+    },
+    "/items/{item_id}/delete": {
+      "post": {
+        "description": "Delete an item, or archive it (hide it and keep it) when orders, downloads, keys or bundles need it, in two calls: without confirmation the answer (202) is the effect and a confirmation id; send that id back once the user agrees.",
+        "operationId": "delete_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Confirm"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDeleteAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDeleteAnswer"
+                }
+              }
+            },
+            "description": "confirmation_required: the effect, and a confirmation id to send back once the user agrees."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Delete Item"
+      }
+    },
+    "/items/{item_id}/move": {
+      "post": {
+        "description": "Move an item to a new place among its category's items.",
+        "operationId": "move_item",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Item Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9_-]{16,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional: 16 to 64 letters, digits, - or _. A retry with the same key and body replays the first answer for 24 hours; the same key with another body is 422.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveItem"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemMoveAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "Refused by the store's rules, with the reason (nothing_to_change, not_ready, not_empty, invalid_arguments, invalid_request)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No token or an unknown one (unauthorized); token_expired, token_revoked, or token_inactive (its creator is no longer the store owner)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "insufficient_scope, writes_disabled, or approval_required (the owner's approval in Telegram)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "No such object."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "changed (with a fresh preview), conflict (with current), already_exists, confirmation_invalid, or idempotency_in_progress."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "A body or header that does not match the contract (invalid_request), or idempotency_key_reused."
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "store_suspended: the store is suspended."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "rate_limited or daily_cap; wait for Retry-After seconds."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteError"
+                }
+              }
+            },
+            "description": "busy: another change holds what this one needs; retry after Retry-After seconds."
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ],
+        "summary": "Move Item"
       }
     },
     "/orders": {

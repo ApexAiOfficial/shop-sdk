@@ -96,6 +96,18 @@ asyncio.run(main())
 | `categories.update(category_id, title=, active=)` | `PATCH /categories/{category_id}` | `Completed` with the `Category` |
 | `categories.move(category_id, to_index)` | `POST /categories/{category_id}/move` | `Completed` with `CategoryMoved` |
 | `categories.delete(category_id, confirmation=)` | `POST /categories/{category_id}/delete` | `ConfirmationRequired`, then `Completed` with `CategoryDeleted` |
+| `items.create(category_id, title, price_stars, description=)` | `POST /items` | `Completed` with the new, hidden `ItemDetail` |
+| `items.update(item_id, version=, title=, description=, price_stars=, active=)` | `PATCH /items/{item_id}` | `Completed` with the `ItemDetail` |
+| `items.move(item_id, to_index)` | `POST /items/{item_id}/move` | `Completed` with `ItemMoved` |
+| `items.delete(item_id, confirmation=)` | `POST /items/{item_id}/delete` | `ConfirmationRequired`, then `Completed` with `ItemDeleted` |
+| `coupons.list(status=, code=, limit=, cursor=)` / `coupons.iter(...)` | `GET /coupons` | `CouponPage` / `Coupon` |
+| `coupons.create(code, pct_off, max_uses=, per_user_max_uses=, expires_at=)` | `POST /coupons` | `Completed` with the `Coupon` |
+| `coupons.update(code, active=, max_uses=, per_user_max_uses=, expires_at=, confirmation=)` | `PATCH /coupons/{code}` | `Completed` with the `Coupon`; switching off a used coupon previews first |
+
+An item edit that sets a title, description or price needs the item's `version`
+from `items.get()`. If the item changed since, the store answers 409 `conflict`:
+`ConflictError.current` holds the item as it is now, to show the user before
+trying again.
 
 Amounts are whole Telegram Stars (`XTR`). Timestamps are timezone-aware
 `datetime` objects; pass `datetime`s for `since=` and `until=` and they are
@@ -119,8 +131,10 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `orders:read` | Orders, order details and open payments (`orders`, `payments`) |
 | `customers:read` | Buyer Telegram user ids in orders, and the `buyer=` filter. Without it, `buyer_tg_user_id` is `None` |
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
-| `coupons:read` | Coupon data (no endpoint in this SDK version yet) |
-| `catalog:write` | Create, rename, show or hide, move and delete categories (`categories.create`, `update`, `move`, `delete`) |
+| `coupons:read` | Coupons and their uses (`coupons.list`, `coupons.iter`) |
+| `catalog:write` | Create, rename, show or hide, move and delete categories and items (`categories.*`, `items.create`, `update`, `move`, `delete`) |
+| `pricing:write` | Prices: needed with `catalog:write` to create an item or change its price. A cut to under half of the last 24 hours' price needs the owner's approval |
+| `coupons:write` | Create coupons and change them (`coupons.create`, `coupons.update`). A large coupon (50% off or more, no limit, or more than 1,000 uses) needs the owner's approval |
 
 The bot offers presets when a token is created: **read-only** (`catalog:read`,
 `inventory:read`, `orders:read`, `reports:read`, `coupons:read`) and presets that add
@@ -128,8 +142,8 @@ write scopes; `/apitoken` in the private chat lists them. A token minted before 
 store took changes through the API has no write scope: mint a new one for a job that
 changes the store.
 
-Further scopes (for prices, stock, coupons and support among them) arrive with the
-operations that need them. Give each token only the scopes the job needs.
+Further scopes (for stock and support among them) arrive with the operations that
+need them. Give each token only the scopes the job needs.
 
 ## Changing the store
 

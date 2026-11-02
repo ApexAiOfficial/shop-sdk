@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The project follows
 
 ## [0.3.0] - Unreleased
 
-Writes, starting with categories. Requires a store whose merchant API takes changes.
+Writes: categories, items, prices and coupons. Requires a store whose merchant API takes changes.
 
 ### Added
 
@@ -31,6 +31,18 @@ Writes, starting with categories. Requires a store whose merchant API takes chan
   `categories.move(category_id, to_index)` and `categories.delete(category_id,
   confirmation=)`, a two-step delete; `confirmation=` takes the preview's
   `confirmation` or its id.
+- Item writes (scope `catalog:write`; `pricing:write` too for a price):
+  `items.create(category_id, title, price_stars, description=)` (created hidden),
+  `items.update(item_id, version=, title=, description=, price_stars=, active=)`,
+  `items.move(item_id, to_index)` and `items.delete(item_id, confirmation=)`, a
+  two-step delete whose preview says whether the item is deleted or archived.
+- Coupons: `coupons.list(status=, code=, limit=, cursor=)` and `coupons.iter()` (scope
+  `coupons:read`); `coupons.create(code, pct_off, max_uses=, per_user_max_uses=,
+  expires_at=)` and `coupons.update(code, active=, max_uses=, per_user_max_uses=,
+  expires_at=, confirmation=)` (scope `coupons:write`). Switching off a used coupon
+  previews first.
+- Models: `Coupon`, `CouponUses`, `CouponPage`, `CouponAnswer`, `ItemAnswer`,
+  `ItemMoveAnswer`, `ItemMoved`, `ItemDeleteAnswer`, `ItemDeleted`.
 - Exceptions for refused writes: `ConflictError` (409, with `current`), `ChangedError`
   (409 `changed`, with a fresh bound `preview`), `ConfirmationInvalidError`,
   `StoreSuspendedError` (423), `DailyCapError` (429 `daily_cap`, a `RateLimitError`),

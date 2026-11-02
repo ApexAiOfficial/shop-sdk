@@ -38,11 +38,32 @@ OPERATIONS: Dict[str, Operation] = {
     "get_order": Operation("GET", "/orders/{order_id}"),
     "list_payments": Operation("GET", "/payments", ("cursor",)),
     "sales_summary": Operation("GET", "/reports/summary", ("days",)),
+    "list_coupons": Operation("GET", "/coupons", ("status", "code", "limit", "cursor")),
     # --- writes ------------------------------------------------------------
     "create_category": Operation("POST", "/categories", body=("title",)),
     "update_category": Operation("PATCH", "/categories/{category_id}", body=("title", "active")),
     "move_category": Operation("POST", "/categories/{category_id}/move", body=("to_index",)),
     "delete_category": Operation(
         "POST", "/categories/{category_id}/delete", body=("confirmation",)
+    ),
+    "create_item": Operation(
+        "POST", "/items", body=("category_id", "title", "description", "price_stars")
+    ),
+    "update_item": Operation(
+        "PATCH",
+        "/items/{item_id}",
+        body=("version", "title", "description", "price_stars", "active"),
+    ),
+    "move_item": Operation("POST", "/items/{item_id}/move", body=("to_index",)),
+    "delete_item": Operation("POST", "/items/{item_id}/delete", body=("confirmation",)),
+    "create_coupon": Operation(
+        "POST",
+        "/coupons",
+        body=("code", "pct_off", "max_uses", "per_user_max_uses", "expires_at"),
+    ),
+    "update_coupon": Operation(
+        "PATCH",
+        "/coupons/{code}",
+        body=("active", "max_uses", "per_user_max_uses", "expires_at", "confirmation"),
     ),
 }

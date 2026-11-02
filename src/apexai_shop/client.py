@@ -21,7 +21,15 @@ from .models import (
     CategoryMoved,
     CategoryPage,
     ConfirmationInfo,
+    Coupon,
+    CouponAnswer,
+    CouponPage,
+    ItemAnswer,
+    ItemDeleteAnswer,
+    ItemDeleted,
     ItemDetail,
+    ItemMoveAnswer,
+    ItemMoved,
     ItemPage,
     ItemSummary,
     OpenReceipt,
@@ -83,6 +91,7 @@ class Shop:
 
         self.categories = Categories(self)
         self.items = Items(self)
+        self.coupons = Coupons(self)
         self.stock = Stock(self)
         self.orders = Orders(self)
         self.payments = Payments(self)
@@ -359,6 +368,193 @@ class Items(_Resource):
     def get(self, item_id: int) -> ItemDetail:
         """One item: text, price, state, delivery, stock, variants and bundle."""
         return self._shop._call("get_item", ItemDetail, path_params={"item_id": item_id})
+
+    def create(
+        self,
+        category_id: int,
+        title: str,
+        price_stars: int,
+        *,
+        description: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[ItemDetail]:
+        """Create an item, hidden, at the end of its category.
+
+        Publish it with :meth:`update` (``active=True``) once it has something
+        to deliver. Needs ``catalog:write`` and ``pricing:write``.
+        """
+        return self._shop._write(
+            "create_item",
+            ItemAnswer,
+            body={
+                "category_id": category_id,
+                "title": title,
+                "description": description,
+                "price_stars": price_stars,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    def update(
+        self,
+        item_id: int,
+        *,
+        version: Optional[str] = None,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        price_stars: Optional[int] = None,
+        active: Optional[bool] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[ItemDetail]:
+        """Change an item's text or price, or publish (``active=True``) or hide it.
+
+        ``None`` leaves a field as it is; set at least one. A title,
+        description or price needs ``version``, the :attr:`ItemDetail.version`
+        you read: if the item changed since, the server answers 409
+        ``conflict`` (:class:`~apexai_shop.ConflictError`, whose ``current``
+        is the item now). A price needs ``pricing:write``; a cut to under half
+        of the last 24 hours' price needs the owner's approval. Publishing an
+        item with nothing to deliver answers 400 ``not_ready``.
+        """
+        return self._shop._write(
+            "update_item",
+            ItemAnswer,
+            path_params={"item_id": item_id},
+            body={
+                "version": version,
+                "title": title,
+                "description": description,
+                "price_stars": price_stars,
+                "active": active,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    def move(
+        self, item_id: int, to_index: int, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[ItemMoved]:
+        """Move an item to a new place in its category (0-based; past the end means last).
+
+        Needs ``catalog:write``.
+        """
+        return self._shop._write(
+            "move_item",
+            ItemMoveAnswer,
+            path_params={"item_id": item_id},
+            body={"to_index": to_index},
+            idempotency_key=idempotency_key,
+        )
+
+    def delete(
+        self,
+        item_id: int,
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[ItemDeleted]:
+        """Delete an item, in two steps.
+
+        The preview's ``effect`` says whether the item is deleted for good or
+        archived (hidden and kept) for the orders, keys or bundles that need
+        it, and how many carts hold it. Call the preview's ``confirm()`` once
+        the user agrees; if that changed meanwhile the server answers 409
+        ``changed`` with a fresh preview. Needs ``catalog:write``.
+        """
+        return self._shop._write(
+            "delete_item",
+            ItemDeleteAnswer,
+            path_params={"item_id": item_id},
+            body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+
+class Coupons(_Resource):
+    def list(
+        self,
+        *,
+        status: Optional[str] = None,
+        code: Optional[str] = None,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> CouponPage:
+        """One page of coupons with their uses.
+
+        ``status`` is ``all``, ``active`` or ``inactive``; ``code`` looks up
+        one coupon (any case). Needs ``coupons:read``.
+        """
+        return self._shop._call(
+            "list_coupons",
+            CouponPage,
+            query={"status": status, "code": code, "limit": limit, "cursor": cursor},
+        )
+
+    def iter(self, *, status: Optional[str] = None, limit: Optional[int] = None) -> Iterator[Coupon]:
+        """Every matching coupon, following ``next_cursor``."""
+        return self._shop._paginate("list_coupons", CouponPage, {"status": status, "limit": limit})
+
+    def create(
+        self,
+        code: str,
+        pct_off: int,
+        *,
+        max_uses: Optional[int] = None,
+        per_user_max_uses: Optional[int] = None,
+        expires_at: Optional[datetime] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Coupon]:
+        """Create a coupon (the code is stored upper-cased).
+
+        ``max_uses=None`` means no limit and ``expires_at=None`` never. A
+        large coupon (50% off or more, no limit, or more than 1,000 uses)
+        needs the owner's approval; the server answers so. Needs
+        ``coupons:write``.
+        """
+        return self._shop._write(
+            "create_coupon",
+            CouponAnswer,
+            body={
+                "code": code,
+                "pct_off": pct_off,
+                "max_uses": max_uses,
+                "per_user_max_uses": per_user_max_uses,
+                "expires_at": expires_at,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+    def update(
+        self,
+        code: str,
+        *,
+        active: Optional[bool] = None,
+        max_uses: Optional[int] = None,
+        per_user_max_uses: Optional[int] = None,
+        expires_at: Optional[datetime] = None,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Coupon]:
+        """Switch a coupon on or off, or change its limits or expiry.
+
+        ``None`` leaves a term as it is; set at least one (removing a limit or
+        the expiry is done in the store's bot). Switching off a coupon that
+        has been used answers a :class:`~apexai_shop.ConfirmationRequired`
+        preview first. Widening a large active coupon needs the owner's
+        approval. Needs ``coupons:write``.
+        """
+        return self._shop._write(
+            "update_coupon",
+            CouponAnswer,
+            path_params={"code": code},
+            body={
+                "active": active,
+                "max_uses": max_uses,
+                "per_user_max_uses": per_user_max_uses,
+                "expires_at": expires_at,
+                "confirmation": confirmation,
+            },
+            idempotency_key=idempotency_key,
+        )
 
 
 class Stock(_Resource):

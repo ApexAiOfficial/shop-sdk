@@ -38,6 +38,17 @@ SALES = {
 
 CATEGORY = {"id": 1, "title": "Guides", "is_active": True, "items": 4, "hidden_items": 1}
 
+COUPON = {
+    "code": "SPRING10",
+    "pct_off": 10,
+    "is_active": True,
+    "max_uses": 100,
+    "per_user_max_uses": 1,
+    "expires_at": "2026-12-01T00:00:00Z",
+    "created_at": "2026-11-01T09:00:00Z",
+    "uses": {"paid": 3, "open_checkouts": 1},
+}
+
 
 def answer(status: str = "done", **fields: Any) -> Dict[str, Any]:
     """A write's envelope: ``done`` unless ``status`` says otherwise, every field present."""
@@ -198,6 +209,7 @@ SAMPLES: Dict[str, Any] = {
         "checkouts_paid": 3,
         "open_tickets": 0,
     },
+    "list_coupons": {"data": [COUPON], "next_cursor": None},
     "create_category": answer(result=CATEGORY),
     "update_category": answer(result=dict(CATEGORY, title="Handbooks")),
     "move_category": answer(result={"id": 1, "from_index": 2, "to_index": 0}),
@@ -205,7 +217,16 @@ SAMPLES: Dict[str, Any] = {
         result={"deleted": True, "category_id": 1},
         effect={"summary": "Delete the category Guides.", "details": {"category_id": 1}},
     ),
+    "move_item": answer(result={"id": 10, "from_index": 3, "to_index": 0}),
+    "delete_item": answer(
+        result={"item_id": 10, "outcome": "archived", "bundle_ids": []},
+        effect={"summary": "Archive the item Guide.", "details": {"outcome": "archived", "carts": 0}},
+    ),
+    "create_coupon": answer(result=COUPON),
+    "update_coupon": answer(result=dict(COUPON, is_active=False)),
 }
+SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
+SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
 
 #: (method, request path after the base URL) -> operation id, for routing mock requests.
 ROUTES = {
@@ -223,6 +244,13 @@ ROUTES = {
     ("PATCH", "/categories/1"): "update_category",
     ("POST", "/categories/1/move"): "move_category",
     ("POST", "/categories/1/delete"): "delete_category",
+    ("GET", "/coupons"): "list_coupons",
+    ("POST", "/items"): "create_item",
+    ("PATCH", "/items/10"): "update_item",
+    ("POST", "/items/10/move"): "move_item",
+    ("POST", "/items/10/delete"): "delete_item",
+    ("POST", "/coupons"): "create_coupon",
+    ("PATCH", "/coupons/SPRING10"): "update_coupon",
 }
 
 PREFIX = "/api/merchant/v1"

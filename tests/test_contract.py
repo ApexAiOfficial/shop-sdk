@@ -64,7 +64,7 @@ def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
     in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) == len(in_contract) == 14
+    assert len(OPERATIONS) == len(in_contract) == 21
 
 
 def test_operation_ids_match(contract):

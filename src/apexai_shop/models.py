@@ -31,10 +31,19 @@ __all__ = [
     "CategoryMoved",
     "CategoryPage",
     "ConfirmationInfo",
+    "Coupon",
+    "CouponAnswer",
+    "CouponPage",
+    "CouponUses",
     "Effect",
+    "ItemAnswer",
     "ItemBundle",
+    "ItemDeleteAnswer",
+    "ItemDeleted",
     "ItemDetail",
     "ItemFile",
+    "ItemMoveAnswer",
+    "ItemMoved",
     "ItemPage",
     "ItemStock",
     "ItemSummary",
@@ -191,6 +200,35 @@ class ItemDetail(_Model):
     """Why publishing would be refused, or ``None``."""
     version: str
     """Changes whenever the title, description or price does."""
+
+
+# --- coupons ---------------------------------------------------------------
+
+
+class CouponUses(_Model):
+    paid: int
+    """Uses held by paid orders."""
+    open_checkouts: int
+    """Uses held by checkouts that can still be paid."""
+
+
+class Coupon(_Model):
+    code: str
+    pct_off: int
+    """Percent off the order."""
+    is_active: bool
+    max_uses: Optional[int]
+    """Uses in all; ``None``: no limit."""
+    per_user_max_uses: Optional[int]
+    """Uses per buyer; ``None``: no limit."""
+    expires_at: Optional[datetime]
+    created_at: datetime
+    uses: CouponUses
+
+
+class CouponPage(_Model):
+    data: List[Coupon]
+    next_cursor: Optional[str]
 
 
 # --- inventory -------------------------------------------------------------
@@ -423,3 +461,35 @@ class CategoryDeleted(_Model):
 
 class CategoryDeleteAnswer(WriteAnswer):
     result: Optional[CategoryDeleted]  # type: ignore[assignment]
+
+
+class ItemAnswer(WriteAnswer):
+    result: Optional[ItemDetail]  # type: ignore[assignment]
+
+
+class ItemMoved(_Model):
+    id: int
+    from_index: int
+    to_index: int
+
+
+class ItemMoveAnswer(WriteAnswer):
+    result: Optional[ItemMoved]  # type: ignore[assignment]
+
+
+class ItemDeleted(_Model):
+    item_id: int
+    outcome: str
+    """``deleted`` for good, or ``archived``, ``archived_with_keys`` or
+    ``archived_in_bundles``: hidden and kept for the orders, keys or bundles
+    that need it."""
+    bundle_ids: List[int]
+    """For ``archived_in_bundles``: the bundles that still sell it."""
+
+
+class ItemDeleteAnswer(WriteAnswer):
+    result: Optional[ItemDeleted]  # type: ignore[assignment]
+
+
+class CouponAnswer(WriteAnswer):
+    result: Optional[Coupon]  # type: ignore[assignment]

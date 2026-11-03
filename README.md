@@ -481,6 +481,12 @@ API version with a new path.
 - [`examples/daily_sales.py`](examples/daily_sales.py): today's paid orders and the 7-day trend.
 - [`examples/low_stock.py`](examples/low_stock.py): items whose licence keys are running out.
 - [`examples/orders_to_csv.py`](examples/orders_to_csv.py): export orders to CSV.
+- [`examples/reprice.py`](examples/reprice.py): safely reprice an item and handle owner approval.
+- [`examples/import_keys.py`](examples/import_keys.py): import licence keys without displaying their text.
+- [`examples/safe_delete.py`](examples/safe_delete.py): preview and confirm a category or item deletion.
+- [`examples/reply_tickets.py`](examples/reply_tickets.py): list open tickets and reply from a file.
+- [`examples/coupon_campaign.py`](examples/coupon_campaign.py): create a limited, expiring coupon campaign.
+- [`examples/webhook_receiver.py`](examples/webhook_receiver.py): receive and verify webhook events.
 
 ## Development
 

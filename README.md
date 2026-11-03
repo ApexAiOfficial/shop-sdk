@@ -117,7 +117,7 @@ asyncio.run(main())
 | `variants.add(item_id, label, price_stars)` | `POST /items/{item_id}/variants` | `Completed` with the new `Variant`, or `PendingApproval` |
 | `variants.update(variant_id, version=, label=, price_stars=, note=, active=)` | `PATCH /variants/{variant_id}` | `Completed` with the `Variant`, or `PendingApproval` |
 | `bundles.create(category_id, title, price_stars)` | `POST /bundles` | `Completed` with the new, hidden bundle item |
-| `bundles.update(bundle_id, add_item_id= or remove_item_id=)` | `PATCH /bundles/{bundle_id}` | `Completed` with the `Bundle` |
+| `bundles.update(bundle_id, add_item_id= or remove_item_id=)` | `PATCH /bundles/{bundle_id}` | `Completed` with the `Bundle`, or `PendingApproval` when an add leaves the bundle under half of its items' own prices |
 | `broadcasts.send(text)` | `POST /broadcasts` | `PendingApproval`; no message is sent until the owner approves |
 | `broadcasts.cancel(broadcast_id)` | `POST /broadcasts/{broadcast_id}/cancel` | `Completed` with `BroadcastInfo` |
 | `coupons.list(status=, code=, limit=, cursor=)` / `coupons.iter(...)` | `GET /coupons` | `CouponPage` / `Coupon` |
@@ -160,7 +160,7 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupons and their uses (`coupons.list`, `coupons.iter`) |
 | `catalog:write` | Create, rename, show or hide, move and delete categories, items, variants and bundles; request product files (`categories.*`, `items.create`, `update`, `move`, `delete`, `request_file`, `variants.*`, `bundles.*`) |
-| `pricing:write` | Prices: needed with `catalog:write` to create an item, variant or bundle or change its price, and for `items.reprice`. A cut to under half of the last 24 hours' price needs the owner's approval |
+| `pricing:write` | Prices: needed with `catalog:write` to create an item, variant or bundle or change its price, to add an item to a bundle, and for `items.reprice`. A cut to under half of the last 24 hours' price, or a bundle add that leaves the bundle under half of what its items sell for apart, needs the owner's approval |
 | `coupons:write` | Create coupons and change them (`coupons.create`, `coupons.update`). A large coupon (50% off or more, no limit, or more than 1,000 uses) needs the owner's approval |
 | `broadcasts:write` | Send broadcasts for owner approval and cancel broadcasts (`broadcasts.send`, `broadcasts.cancel`) |
 
@@ -260,12 +260,13 @@ API refuses with `ChangedError`, whose `preview` is a fresh
 shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
 (`result.answer.model_dump(mode="json")`), id included, to return as data.
 
-**Owner approvals.** Broadcasts, deep price cuts, large coupons, and ticket
-replies that contain contact details can answer `PendingApproval`. The change is queued but
-is not made unless the store owner taps **Approve** in Telegram within 15
-minutes; never report it as done from the 202 answer. Call
-`pending.wait(timeout=900, poll=2)` to poll through the originating `Shop` and
-return the final `Approval`, or use `shop.approvals.get(pending.approval.id)`
+**Owner approvals.** Broadcasts, deep price cuts (a new variant or a bundle add
+included), large coupons, and ticket replies that contain contact details can
+answer `PendingApproval`. The change is queued but is not made unless the
+store owner taps **Approve** in Telegram within 15 minutes; never report it
+as done from the 202 answer. Call `pending.wait(timeout=900, poll=2)` to poll
+through the originating `Shop` and return the final `Approval`, or use
+`shop.approvals.get(pending.approval.id)`
 directly. Rejected, expired, changed and failed approvals are returned normally
 so callers can branch on `approval.status`; an approval that is still pending at
 the timeout raises `ApprovalTimeoutError`. With `AsyncShop`, the result is an

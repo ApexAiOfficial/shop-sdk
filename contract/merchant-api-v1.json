@@ -6038,6 +6038,16 @@
             },
             "description": "Successful Response"
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleAnswer"
+                }
+              }
+            },
+            "description": "pending_approval: nothing changed yet; the store owner must tap Approve in Telegram within 15 minutes (check get_approval)."
+          },
           "400": {
             "content": {
               "application/json": {

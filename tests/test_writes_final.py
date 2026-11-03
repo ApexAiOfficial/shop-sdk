@@ -123,6 +123,37 @@ def test_bundle_create_update_and_exactly_one_component_change():
     assert len(rec.requests) == 2
 
 
+BUNDLE_REASON = (
+    "the bundle sells for 100 Stars, 80% below the 500 Stars its items sell for apart:"
+    " over the 50% limit"
+)
+
+
+def test_bundle_add_under_half_its_items_waits_for_approval():
+    shop, rec, _ = make_shop(lambda request: httpx.Response(202, json=_pending(BUNDLE_REASON)))
+    pending = shop.bundles.update(11, add_item_id=10)
+
+    assert isinstance(pending, PendingApproval)
+    assert pending.status == "pending_approval"
+    assert pending.approval.reasons == [BUNDLE_REASON]
+    assert [(r.method, _path(r), _body(r)) for r in rec.requests] == [
+        ("PATCH", "/bundles/11", {"add_item_id": 10}),
+    ]
+
+
+def test_async_bundle_add_can_wait_for_approval():
+    async def scenario():
+        shop, rec, _ = make_async_shop(
+            lambda request: httpx.Response(202, json=_pending(BUNDLE_REASON))
+        )
+        return rec, await shop.bundles.update(11, add_item_id=10)
+
+    rec, pending = asyncio.run(scenario())
+    assert isinstance(pending, AsyncPendingApproval)
+    assert pending.approval.id == 12
+    assert len(rec.requests) == 1
+
+
 def test_request_file_shape_and_transport_error_is_never_retried():
     shop, rec, _ = make_shop()
     requested = shop.items.request_file(10, variant_id=20)

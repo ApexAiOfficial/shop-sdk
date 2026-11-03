@@ -369,7 +369,14 @@ class AsyncBundles(_AsyncResource):
         remove_item_id: Optional[int] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Bundle]:
-        """Add or remove exactly one product-file item. Needs ``catalog:write``."""
+        """Add or remove exactly one product-file item.
+
+        Removing needs ``catalog:write``; adding needs ``pricing:write`` too,
+        because the added item then sells for a share of the bundle's price.
+        An add that leaves the bundle priced under half of what its items sell
+        for apart answers :class:`~apexai_shop.PendingApproval`: nothing
+        changes unless the store owner approves it in Telegram.
+        """
         if (add_item_id is None) == (remove_item_id is None):
             raise ValueError("Pass exactly one of add_item_id or remove_item_id.")
         return await self._shop._write(

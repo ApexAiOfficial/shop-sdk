@@ -54,7 +54,9 @@ whose merchant API takes changes.
 - Variants and bundles: `variants.add`, `variants.update`, `bundles.create` and
   `bundles.update`, with per-variant optimistic versions and exactly one bundle
   component added or removed per update. Deep variant price cuts can wait for
-  owner approval.
+  owner approval. Adding an item to a bundle needs `pricing:write`, and
+  `bundles.update` answers `PendingApproval` when an add leaves the bundle
+  priced under half of what its items sell for apart.
 - Product files: `items.request_file(item_id, variant_id=)` prompts the owner in
   Telegram. It carries a fresh idempotency key per call but is never retried
   automatically, because every call creates a new prompt.
@@ -115,7 +117,8 @@ whose merchant API takes changes.
 
 - The bundled contracts are synchronized to revision 2026-11-04. The merchant
   API contract adds the approval read and documents 202 `pending_approval` for
-  broadcasts, deep price cuts, large coupons and guarded support replies;
+  broadcasts, deep price cuts (new variants and bundle adds included), large
+  coupons and guarded support replies;
   the contract tests also check every write's body fields and declared idempotency header,
   and that every nullable body field is optional (the client leaves out `None`).
 - CI type-checks the package, the examples and the README's write examples with

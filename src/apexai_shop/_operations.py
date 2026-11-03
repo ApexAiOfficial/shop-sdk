@@ -46,6 +46,24 @@ OPERATIONS: Dict[str, Operation] = {
     "sales_summary": Operation("GET", "/reports/summary", ("days",)),
     "list_coupons": Operation("GET", "/coupons", ("status", "code", "limit", "cursor")),
     # --- writes ------------------------------------------------------------
+    "send_broadcast": Operation(
+        "POST", "/broadcasts", body=("text",), uses_idempotency_key=True
+    ),
+    "cancel_broadcast": Operation(
+        "POST", "/broadcasts/{broadcast_id}/cancel", uses_idempotency_key=True
+    ),
+    "create_bundle": Operation(
+        "POST",
+        "/bundles",
+        body=("category_id", "price_stars", "title"),
+        uses_idempotency_key=True,
+    ),
+    "update_bundle": Operation(
+        "PATCH",
+        "/bundles/{bundle_id}",
+        body=("add_item_id", "remove_item_id"),
+        uses_idempotency_key=True,
+    ),
     "create_category": Operation("POST", "/categories", body=("title",), uses_idempotency_key=True),
     "update_category": Operation(
         "PATCH", "/categories/{category_id}", body=("title", "active"), uses_idempotency_key=True
@@ -76,6 +94,30 @@ OPERATIONS: Dict[str, Operation] = {
     ),
     "delete_item": Operation(
         "POST", "/items/{item_id}/delete", body=("confirmation",), uses_idempotency_key=True
+    ),
+    "request_product_file": Operation(
+        "POST",
+        "/items/{item_id}/file-request",
+        body=("variant_id",),
+        uses_idempotency_key=True,
+    ),
+    "add_variant": Operation(
+        "POST",
+        "/items/{item_id}/variants",
+        body=("label", "price_stars"),
+        uses_idempotency_key=True,
+    ),
+    "update_variant": Operation(
+        "PATCH",
+        "/variants/{variant_id}",
+        body=("active", "label", "note", "price_stars", "version"),
+        uses_idempotency_key=True,
+    ),
+    "reprice_items": Operation(
+        "POST",
+        "/reprice",
+        body=("changes", "confirmation"),
+        uses_idempotency_key=True,
     ),
     "create_coupon": Operation(
         "POST",

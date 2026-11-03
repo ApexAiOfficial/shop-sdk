@@ -49,6 +49,30 @@ COUPON = {
     "uses": {"paid": 3, "open_checkouts": 1},
 }
 
+BROADCAST = {
+    "id": 30,
+    "status": "sending",
+    "recipients": 25,
+    "pending": 20,
+    "sent": 5,
+    "failed": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "created_at": "2026-11-03T12:00:00Z",
+    "finished_at": None,
+}
+
+VARIANT = {
+    "id": 20,
+    "item_id": 10,
+    "label": "Personal",
+    "price_stars": 300,
+    "is_active": False,
+    "file_status": "item_file",
+    "licence_note": None,
+    "version": "0123456789abcdef",
+}
+
 APPROVAL = {
     "id": 12,
     "operation": "update_item",
@@ -93,7 +117,7 @@ def preview(confirmation_id: str = "conf_abc123", summary: str = "Delete the cat
 SAMPLES: Dict[str, Any] = {
     "get_approval": APPROVAL,
     "get_store": {
-        "api_version": "1", "api_revision": "2026-11-02",
+        "api_version": "1", "api_revision": "2026-11-04",
         "store": {"name": "Demo Store", "tier": "business", "currency": "XTR"},
         "token": {
             "id": 7,
@@ -328,9 +352,47 @@ SAMPLES: Dict[str, Any] = {
             "notified": True,
         }
     ),
+    "send_broadcast": answer(
+        "pending_approval",
+        approval={
+            "id": 12,
+            "status": "pending",
+            "expires_at": "2026-11-03T12:15:00Z",
+            "reasons": ["broadcast_requires_owner"],
+        },
+    ),
+    "cancel_broadcast": answer(result=dict(BROADCAST, status="cancelled")),
+    "add_variant": answer(result=VARIANT),
+    "update_variant": answer(result=dict(VARIANT, price_stars=250)),
+    "request_product_file": answer(result={"sent": True, "item_id": 10, "variant_id": None}),
+    "reprice_items": answer(
+        result={
+            "items": [
+                {
+                    "item_id": 10,
+                    "price_stars": 250,
+                    "version": "fedcba9876543210",
+                    "changed": True,
+                }
+            ]
+        }
+    ),
 }
 SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
 SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
+SAMPLES["create_bundle"] = answer(
+    result=dict(SAMPLES["get_item"], id=11, delivery="bundle", stock=None, status="hidden")
+)
+SAMPLES["update_bundle"] = answer(
+    result=dict(
+        SAMPLES["create_bundle"]["result"],
+        bundle={
+            "components": [{"id": 10, "title": "Guide", "own_price": 300, "problem": None}],
+            "ready": False,
+        },
+        warning="A bundle should contain at least two items.",
+    )
+)
 
 #: (method, request path after the base URL) -> operation id, for routing mock requests.
 ROUTES = {
@@ -366,6 +428,14 @@ ROUTES = {
     ("POST", "/items/10/keys/commit"): "commit_key_import",
     ("POST", "/items/10/keys/void"): "void_keys",
     ("POST", "/items/10/keys/release"): "release_key_holds",
+    ("POST", "/broadcasts"): "send_broadcast",
+    ("POST", "/broadcasts/30/cancel"): "cancel_broadcast",
+    ("POST", "/bundles"): "create_bundle",
+    ("PATCH", "/bundles/11"): "update_bundle",
+    ("POST", "/items/10/variants"): "add_variant",
+    ("PATCH", "/variants/20"): "update_variant",
+    ("POST", "/items/10/file-request"): "request_product_file",
+    ("POST", "/reprice"): "reprice_items",
 }
 
 PREFIX = "/api/merchant/v1"

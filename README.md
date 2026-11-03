@@ -112,6 +112,14 @@ asyncio.run(main())
 | `items.update(item_id, version=, title=, description=, price_stars=, active=)` | `PATCH /items/{item_id}` | `Completed` with the `ItemDetail` |
 | `items.move(item_id, to_index)` | `POST /items/{item_id}/move` | `Completed` with `ItemMoved` |
 | `items.delete(item_id, confirmation=)` | `POST /items/{item_id}/delete` | `ConfirmationRequired`, then `Completed` with `ItemDeleted` |
+| `items.request_file(item_id, variant_id=)` | `POST /items/{item_id}/file-request` | `Completed` with `FileRequested`; sends the owner a new Telegram prompt |
+| `items.reprice(changes, confirmation=)` | `POST /reprice` | `ConfirmationRequired`, then `Completed` with `RepriceResult`, or `PendingApproval` for deep cuts |
+| `variants.add(item_id, label, price_stars)` | `POST /items/{item_id}/variants` | `Completed` with the new `Variant`, or `PendingApproval` |
+| `variants.update(variant_id, version=, label=, price_stars=, note=, active=)` | `PATCH /variants/{variant_id}` | `Completed` with the `Variant`, or `PendingApproval` |
+| `bundles.create(category_id, title, price_stars)` | `POST /bundles` | `Completed` with the new, hidden bundle item |
+| `bundles.update(bundle_id, add_item_id= or remove_item_id=)` | `PATCH /bundles/{bundle_id}` | `Completed` with the `Bundle` |
+| `broadcasts.send(text)` | `POST /broadcasts` | `PendingApproval`; no message is sent until the owner approves |
+| `broadcasts.cancel(broadcast_id)` | `POST /broadcasts/{broadcast_id}/cancel` | `Completed` with `BroadcastInfo` |
 | `coupons.list(status=, code=, limit=, cursor=)` / `coupons.iter(...)` | `GET /coupons` | `CouponPage` / `Coupon` |
 | `coupons.create(code, pct_off, max_uses=, per_user_max_uses=, expires_at=)` | `POST /coupons` | `Completed` with the `Coupon` |
 | `coupons.update(code, active=, max_uses=, per_user_max_uses=, expires_at=, confirmation=)` | `PATCH /coupons/{code}` | `Completed` with the `Coupon`; switching off a used coupon previews first |
@@ -151,9 +159,10 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `fulfillment:write` | Restore file downloads and their download window for a paid order (`orders.restore_downloads`) |
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupons and their uses (`coupons.list`, `coupons.iter`) |
-| `catalog:write` | Create, rename, show or hide, move and delete categories and items (`categories.*`, `items.create`, `update`, `move`, `delete`) |
-| `pricing:write` | Prices: needed with `catalog:write` to create an item or change its price. A cut to under half of the last 24 hours' price needs the owner's approval |
+| `catalog:write` | Create, rename, show or hide, move and delete categories, items, variants and bundles; request product files (`categories.*`, `items.create`, `update`, `move`, `delete`, `request_file`, `variants.*`, `bundles.*`) |
+| `pricing:write` | Prices: needed with `catalog:write` to create an item, variant or bundle or change its price, and for `items.reprice`. A cut to under half of the last 24 hours' price needs the owner's approval |
 | `coupons:write` | Create coupons and change them (`coupons.create`, `coupons.update`). A large coupon (50% off or more, no limit, or more than 1,000 uses) needs the owner's approval |
+| `broadcasts:write` | Send broadcasts for owner approval and cancel broadcasts (`broadcasts.send`, `broadcasts.cancel`) |
 
 The bot offers presets when a token is created: **read-only** (`catalog:read`,
 `inventory:read`, `orders:read`, `reports:read`, `coupons:read`) and presets that add
@@ -251,8 +260,8 @@ API refuses with `ChangedError`, whose `preview` is a fresh
 shown by `repr()`; `result.answer` holds the whole envelope as a pydantic model
 (`result.answer.model_dump(mode="json")`), id included, to return as data.
 
-**Owner approvals.** Deep price cuts, large coupons, and ticket replies that
-contain contact details can answer `PendingApproval`. The change is queued but
+**Owner approvals.** Broadcasts, deep price cuts, large coupons, and ticket
+replies that contain contact details can answer `PendingApproval`. The change is queued but
 is not made unless the store owner taps **Approve** in Telegram within 15
 minutes; never report it as done from the 202 answer. Call
 `pending.wait(timeout=900, poll=2)` to poll through the originating `Shop` and
@@ -276,14 +285,18 @@ shop.categories.create("Guides", idempotency_key="import-2026-11-02-guides")
 
 Staging licence-key text is the contract's exception: each stage is new and
 does not take an idempotency key. The SDK does not automatically retry staging
-after an ambiguous failure, avoiding duplicate open stages.
+after an ambiguous failure, avoiding duplicate open stages. A product-file
+request does carry a key, but it is also never retried automatically: every
+call sends the owner a new Telegram prompt. If it fails without an answer,
+make a new call with the default fresh key; do not reuse the failed call's key.
 
 **When a write fails without an answer.** A `ConnectionError`, a `ServerError`
 or an `invalid_response` error on a write does not tell you whether the change
 was made. Every error from an idempotent write carries the call's
-`idempotency_key`: repeat the same call with it, and the API answers the stored result if the
-change was made, or makes it once if it was not. A new call without that key
-is a new change (two `create("Guides")` calls create two categories):
+`idempotency_key`: except for `items.request_file`, repeat the same call with
+it, and the API answers the stored result if the change was made, or makes it
+once if it was not. A new call without that key is a new change (two
+`create("Guides")` calls create two categories):
 
 ```python
 from apexai_shop import ConnectionError, ServerError

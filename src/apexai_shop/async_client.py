@@ -29,6 +29,10 @@ from .errors import ConnectionError, ShopError
 from .models import (
     Approval,
     Attention,
+    BroadcastAnswer,
+    BroadcastInfo,
+    Bundle,
+    BundleAnswer,
     Category,
     CategoryAnswer,
     CategoryDeleteAnswer,
@@ -42,6 +46,8 @@ from .models import (
     CouponPage,
     DownloadsRestoreAnswer,
     DownloadsRestored,
+    FileRequestAnswer,
+    FileRequested,
     HoldsReleaseAnswer,
     HoldsReleased,
     ItemAnswer,
@@ -65,6 +71,9 @@ from .models import (
     OrderPage,
     OrderSummary,
     PaymentPage,
+    RepriceAnswer,
+    RepriceChange,
+    RepriceResult,
     SalesSummary,
     StockDetail,
     StockLevel,
@@ -77,6 +86,8 @@ from .models import (
     TicketReplied,
     TicketReplyAnswer,
     TicketSummary,
+    Variant,
+    VariantAnswer,
     WriteAnswer,
 )
 from .results import AsyncConfirmationRequired, AsyncPendingApproval, Completed, WriteResult
@@ -123,8 +134,11 @@ class AsyncShop:
         self._sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
 
         self.approvals = AsyncApprovals(self)
+        self.broadcasts = AsyncBroadcasts(self)
+        self.bundles = AsyncBundles(self)
         self.categories = AsyncCategories(self)
         self.items = AsyncItems(self)
+        self.variants = AsyncVariants(self)
         self.coupons = AsyncCoupons(self)
         self.stock = AsyncStock(self)
         self.orders = AsyncOrders(self)
@@ -248,7 +262,11 @@ class AsyncShop:
         )
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
-        retryable = not write or idempotency_key is not None
+        # Each file request sends the owner another Telegram prompt. Even though
+        # the call carries a key, an ambiguous answer is never retried here.
+        retryable = (not write or idempotency_key is not None) and (
+            operation_id != "request_product_file"
+        )
         attempt = 0
         answer_lost = False  # an earlier attempt may have reached the server
         while True:
@@ -299,6 +317,67 @@ class AsyncApprovals(_AsyncResource):
         """A queued change and whether the store owner approved it."""
         return await self._shop._call(
             "get_approval", Approval, path_params={"approval_id": approval_id}
+        )
+
+
+class AsyncBroadcasts(_AsyncResource):
+    async def send(
+        self, text: str, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[BroadcastInfo]:
+        """Queue a plain-text broadcast for owner approval. Needs ``broadcasts:write``."""
+        return await self._shop._write(
+            "send_broadcast",
+            BroadcastAnswer,
+            body={"text": text},
+            idempotency_key=idempotency_key,
+        )
+
+    async def cancel(
+        self, broadcast_id: int, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[BroadcastInfo]:
+        """Stop a queued or sending broadcast. Needs ``broadcasts:write``."""
+        return await self._shop._write(
+            "cancel_broadcast",
+            BroadcastAnswer,
+            path_params={"broadcast_id": broadcast_id},
+            idempotency_key=idempotency_key,
+        )
+
+
+class AsyncBundles(_AsyncResource):
+    async def create(
+        self,
+        category_id: int,
+        title: str,
+        price_stars: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[ItemDetail]:
+        """Create an empty, hidden bundle. Needs ``catalog:write`` and ``pricing:write``."""
+        return await self._shop._write(
+            "create_bundle",
+            ItemAnswer,
+            body={"category_id": category_id, "title": title, "price_stars": price_stars},
+            idempotency_key=idempotency_key,
+        )
+
+    async def update(
+        self,
+        bundle_id: int,
+        *,
+        add_item_id: Optional[int] = None,
+        remove_item_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Bundle]:
+        """Add or remove exactly one product-file item. Needs ``catalog:write``."""
+        if (add_item_id is None) == (remove_item_id is None):
+            raise ValueError("Pass exactly one of add_item_id or remove_item_id.")
+        return await self._shop._write(
+            "update_bundle",
+            BundleAnswer,
+            path_params={"bundle_id": bundle_id},
+            body={"add_item_id": add_item_id, "remove_item_id": remove_item_id},
+            idempotency_key=idempotency_key,
         )
 
 
@@ -507,6 +586,89 @@ class AsyncItems(_AsyncResource):
             ItemDeleteAnswer,
             path_params={"item_id": item_id},
             body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    async def request_file(
+        self,
+        item_id: int,
+        *,
+        variant_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[FileRequested]:
+        """Ask the owner in Telegram for an item's or variant's product file.
+
+        Every call sends a new prompt and is never retried automatically after
+        a transport error. Needs ``catalog:write``.
+        """
+        return await self._shop._write(
+            "request_product_file",
+            FileRequestAnswer,
+            path_params={"item_id": item_id},
+            body={"variant_id": variant_id},
+            idempotency_key=idempotency_key,
+        )
+
+    async def reprice(
+        self,
+        changes: List[RepriceChange],
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[RepriceResult]:
+        """Preview or apply up to 100 item prices in one two-step write."""
+        return await self._shop._write(
+            "reprice_items",
+            RepriceAnswer,
+            body={
+                "changes": [change.model_dump(mode="json") for change in changes],
+                "confirmation": confirmation,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+
+class AsyncVariants(_AsyncResource):
+    async def add(
+        self,
+        item_id: int,
+        label: str,
+        price_stars: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Variant]:
+        """Add a hidden variant to an item. Needs ``catalog:write`` and ``pricing:write``."""
+        return await self._shop._write(
+            "add_variant",
+            VariantAnswer,
+            path_params={"item_id": item_id},
+            body={"label": label, "price_stars": price_stars},
+            idempotency_key=idempotency_key,
+        )
+
+    async def update(
+        self,
+        variant_id: int,
+        *,
+        version: Optional[str] = None,
+        label: Optional[str] = None,
+        price_stars: Optional[int] = None,
+        note: Optional[str] = None,
+        active: Optional[bool] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Variant]:
+        """Change a variant using its own version, or show or hide it."""
+        return await self._shop._write(
+            "update_variant",
+            VariantAnswer,
+            path_params={"variant_id": variant_id},
+            body={
+                "version": version,
+                "label": label,
+                "price_stars": price_stars,
+                "note": note,
+                "active": active,
+            },
             idempotency_key=idempotency_key,
         )
 

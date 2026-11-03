@@ -17,15 +17,6 @@ from conftest import SAMPLES
 ERROR_SCHEMAS = {"Error", "InvalidRequest", "WriteError"}
 SDK_ONLY_MODELS = {"KeyImportBatch", "KeyImportSummary"}
 
-# PENDING CONTRACT SYNC: the store's owner approvals (get_approval, the Approval model and the
-# reasons on ApprovalInfo) are built against the next contract revision, which the bundled copy
-# does not have yet. The sync that brings them must empty these three; the test below fails once
-# the contract has any of them.
-PENDING_OPERATIONS = {"get_approval": ("GET", "/approvals/{approval_id}")}
-PENDING_MODELS = {"Approval"}
-PENDING_FIELDS = {"ApprovalInfo": {"reasons"}}
-
-
 def _operations(contract):
     for path, methods in contract["paths"].items():
         for method, op in methods.items():
@@ -71,21 +62,9 @@ def test_contract_is_version_1(contract):
 
 def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
-    in_table = {(op.method, op.path) for name, op in OPERATIONS.items() if name not in PENDING_OPERATIONS}
+    in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) - len(PENDING_OPERATIONS) == len(in_contract) == 31
-    for name, (method, path) in PENDING_OPERATIONS.items():
-        assert OPERATIONS[name][:2] == (method, path), name
-
-
-def test_pending_items_are_not_in_the_contract_yet(contract):
-    """Empty the PENDING_* sets above when the contract that has them is synced."""
-    ids = {op["operationId"] for _, _, op in _operations(contract)}
-    schemas = contract["components"]["schemas"]
-    assert not set(PENDING_OPERATIONS) & ids
-    assert not PENDING_MODELS & set(schemas)
-    for name, fields in PENDING_FIELDS.items():
-        assert not fields & set(schemas[name]["properties"]), name
+    assert len(OPERATIONS) == len(in_contract) == 40
 
 
 def test_operation_ids_match(contract):
@@ -135,11 +114,12 @@ def test_nullable_body_fields_are_optional(contract):
     assert checked > 0
 
 
-def test_reads_are_gets_and_writes_have_bodies(contract):
+def test_operation_write_classification(contract):
     for method, _, op in _operations(contract):
         table = OPERATIONS[op["operationId"]]
         assert table.is_write == (method != "GET"), op["operationId"]
-        assert table.is_write == ("requestBody" in op), op["operationId"]
+        if method == "GET":
+            assert "requestBody" not in op, op["operationId"]
     assert {op.method for op in OPERATIONS.values()} == {"GET", "POST", "PATCH"}
 
 
@@ -204,16 +184,16 @@ def test_every_schema_has_a_model(contract):
 
 
 def test_no_model_without_a_schema(contract):
-    names = set(_schemas(contract)) | SDK_ONLY_MODELS | PENDING_MODELS
+    names = set(_schemas(contract)) | SDK_ONLY_MODELS
     for name in models.__all__:
         assert name in names, name
 
 
-@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS - PENDING_MODELS))
+@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS))
 def test_model_fields_match_schema(contract, name):
     schema = contract["components"]["schemas"][name]
     model = getattr(models, name)
-    assert set(model.model_fields) - PENDING_FIELDS.get(name, set()) == set(schema["properties"])
+    assert set(model.model_fields) == set(schema["properties"])
     for field in schema.get("required", []):
         assert model.model_fields[field].is_required(), f"{name}.{field}"
 
@@ -230,7 +210,7 @@ def _is_datetime(prop) -> bool:
     return any(option.get("format") == "date-time" for option in prop.get("anyOf", []))
 
 
-@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS - PENDING_MODELS))
+@pytest.mark.parametrize("name", sorted(set(models.__all__) - SDK_ONLY_MODELS))
 def test_model_nullability_and_datetimes_match_schema(contract, name):
     from datetime import datetime
 
@@ -275,6 +255,11 @@ def test_write_answer_subclasses_only_type_the_result(contract):
         "TicketReplyAnswer",
         "TicketCloseAnswer",
         "DownloadsRestoreAnswer",
+        "BroadcastAnswer",
+        "BundleAnswer",
+        "FileRequestAnswer",
+        "RepriceAnswer",
+        "VariantAnswer",
     ):
         schema = contract["components"]["schemas"][name]
         assert set(schema["properties"]) == set(base["properties"])

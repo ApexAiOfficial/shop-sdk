@@ -28,6 +28,10 @@ from .errors import ConnectionError, ShopError
 from .models import (
     Approval,
     Attention,
+    BroadcastAnswer,
+    BroadcastInfo,
+    Bundle,
+    BundleAnswer,
     Category,
     CategoryAnswer,
     CategoryDeleteAnswer,
@@ -41,6 +45,8 @@ from .models import (
     CouponPage,
     DownloadsRestoreAnswer,
     DownloadsRestored,
+    FileRequestAnswer,
+    FileRequested,
     HoldsReleaseAnswer,
     HoldsReleased,
     ItemAnswer,
@@ -64,6 +70,9 @@ from .models import (
     OrderPage,
     OrderSummary,
     PaymentPage,
+    RepriceAnswer,
+    RepriceChange,
+    RepriceResult,
     SalesSummary,
     StockDetail,
     StockLevel,
@@ -76,6 +85,8 @@ from .models import (
     TicketReplied,
     TicketReplyAnswer,
     TicketSummary,
+    Variant,
+    VariantAnswer,
     WriteAnswer,
 )
 from .results import Completed, ConfirmationRequired, WriteResult
@@ -101,7 +112,8 @@ class Shop:
     Every error from an idempotent write carries its ``idempotency_key``, to
     repeat the same call safely when the error does not say whether the change
     was made. Key staging is the contract's exception: it is not retried after
-    an ambiguous failure, so it cannot create duplicate open stages.
+    an ambiguous failure, so it cannot create duplicate open stages. Product
+    file requests are not retried either: every call prompts the owner again.
 
     Pass ``http_client`` to reuse your own :class:`httpx.Client` (its timeout
     and transport are kept, and :meth:`close` leaves it open).
@@ -128,8 +140,11 @@ class Shop:
         self._sleep: Callable[[float], None] = time.sleep
 
         self.approvals = Approvals(self)
+        self.broadcasts = Broadcasts(self)
+        self.bundles = Bundles(self)
         self.categories = Categories(self)
         self.items = Items(self)
+        self.variants = Variants(self)
         self.coupons = Coupons(self)
         self.stock = Stock(self)
         self.orders = Orders(self)
@@ -249,7 +264,11 @@ class Shop:
         )
         headers = _core.request_headers(self._headers, idempotency_key)
         write = json_body is not None
-        retryable = not write or idempotency_key is not None
+        # Each file request sends the owner another Telegram prompt. Even though
+        # the call carries a key, an ambiguous answer is never retried here.
+        retryable = (not write or idempotency_key is not None) and (
+            operation_id != "request_product_file"
+        )
         attempt = 0
         answer_lost = False  # an earlier attempt may have reached the server
         while True:
@@ -299,6 +318,71 @@ class Approvals(_Resource):
         """A queued change and whether the store owner approved it."""
         return self._shop._call(
             "get_approval", Approval, path_params={"approval_id": approval_id}
+        )
+
+
+class Broadcasts(_Resource):
+    def send(
+        self, text: str, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[BroadcastInfo]:
+        """Queue a plain-text broadcast for the store owner's approval.
+
+        Nothing is sent from this call: it answers :class:`PendingApproval`.
+        Needs ``broadcasts:write``.
+        """
+        return self._shop._write(
+            "send_broadcast",
+            BroadcastAnswer,
+            body={"text": text},
+            idempotency_key=idempotency_key,
+        )
+
+    def cancel(
+        self, broadcast_id: int, *, idempotency_key: Optional[str] = None
+    ) -> WriteResult[BroadcastInfo]:
+        """Stop a queued or sending broadcast. Needs ``broadcasts:write``."""
+        return self._shop._write(
+            "cancel_broadcast",
+            BroadcastAnswer,
+            path_params={"broadcast_id": broadcast_id},
+            idempotency_key=idempotency_key,
+        )
+
+
+class Bundles(_Resource):
+    def create(
+        self,
+        category_id: int,
+        title: str,
+        price_stars: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[ItemDetail]:
+        """Create an empty, hidden bundle. Needs ``catalog:write`` and ``pricing:write``."""
+        return self._shop._write(
+            "create_bundle",
+            ItemAnswer,
+            body={"category_id": category_id, "title": title, "price_stars": price_stars},
+            idempotency_key=idempotency_key,
+        )
+
+    def update(
+        self,
+        bundle_id: int,
+        *,
+        add_item_id: Optional[int] = None,
+        remove_item_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Bundle]:
+        """Add or remove exactly one product-file item. Needs ``catalog:write``."""
+        if (add_item_id is None) == (remove_item_id is None):
+            raise ValueError("Pass exactly one of add_item_id or remove_item_id.")
+        return self._shop._write(
+            "update_bundle",
+            BundleAnswer,
+            path_params={"bundle_id": bundle_id},
+            body={"add_item_id": add_item_id, "remove_item_id": remove_item_id},
+            idempotency_key=idempotency_key,
         )
 
 
@@ -524,6 +608,99 @@ class Items(_Resource):
             ItemDeleteAnswer,
             path_params={"item_id": item_id},
             body={"confirmation": confirmation},
+            idempotency_key=idempotency_key,
+        )
+
+    def request_file(
+        self,
+        item_id: int,
+        *,
+        variant_id: Optional[int] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[FileRequested]:
+        """Ask the owner in Telegram for an item's or variant's product file.
+
+        Every call sends a new prompt. This operation is never retried
+        automatically after a transport error; a later call uses a new key by
+        default. Needs ``catalog:write``.
+        """
+        return self._shop._write(
+            "request_product_file",
+            FileRequestAnswer,
+            path_params={"item_id": item_id},
+            body={"variant_id": variant_id},
+            idempotency_key=idempotency_key,
+        )
+
+    def reprice(
+        self,
+        changes: List[RepriceChange],
+        *,
+        confirmation: Union[str, ConfirmationInfo, None] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[RepriceResult]:
+        """Preview or apply up to 100 item prices in one two-step write.
+
+        Each change carries the item's version. Deep cuts may answer
+        :class:`~apexai_shop.PendingApproval` instead of a preview. Needs
+        ``pricing:write``.
+        """
+        return self._shop._write(
+            "reprice_items",
+            RepriceAnswer,
+            body={
+                "changes": [change.model_dump(mode="json") for change in changes],
+                "confirmation": confirmation,
+            },
+            idempotency_key=idempotency_key,
+        )
+
+
+class Variants(_Resource):
+    def add(
+        self,
+        item_id: int,
+        label: str,
+        price_stars: int,
+        *,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Variant]:
+        """Add a hidden variant to an item. Needs ``catalog:write`` and ``pricing:write``."""
+        return self._shop._write(
+            "add_variant",
+            VariantAnswer,
+            path_params={"item_id": item_id},
+            body={"label": label, "price_stars": price_stars},
+            idempotency_key=idempotency_key,
+        )
+
+    def update(
+        self,
+        variant_id: int,
+        *,
+        version: Optional[str] = None,
+        label: Optional[str] = None,
+        price_stars: Optional[int] = None,
+        note: Optional[str] = None,
+        active: Optional[bool] = None,
+        idempotency_key: Optional[str] = None,
+    ) -> WriteResult[Variant]:
+        """Change a variant using its own version, or show or hide it.
+
+        Label, price and note edits require the variant's ``version`` from
+        :meth:`Items.get`. A deep price cut may wait for owner approval.
+        """
+        return self._shop._write(
+            "update_variant",
+            VariantAnswer,
+            path_params={"variant_id": variant_id},
+            body={
+                "version": version,
+                "label": label,
+                "price_stars": price_stars,
+                "note": note,
+                "active": active,
+            },
             idempotency_key=idempotency_key,
         )
 

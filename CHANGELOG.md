@@ -5,7 +5,9 @@ All notable changes to this project are documented here. The project follows
 
 ## [0.3.0] - Unreleased
 
-Writes: categories, items, prices, coupons, support and fulfilment. Requires a store whose merchant API takes changes.
+Completes the merchant API write surface: catalog, prices, coupons, licence
+keys, support, fulfilment, broadcasts and product delivery. Requires a store
+whose merchant API takes changes.
 
 ### Added
 
@@ -46,6 +48,19 @@ Writes: categories, items, prices, coupons, support and fulfilment. Requires a s
   `items.update(item_id, version=, title=, description=, price_stars=, active=)`,
   `items.move(item_id, to_index)` and `items.delete(item_id, confirmation=)`, a
   two-step delete whose preview says whether the item is deleted or archived.
+- Broadcasts (scope `broadcasts:write`): `broadcasts.send(text)` always queues
+  owner approval before any buyer receives it; `broadcasts.cancel(id)` stops
+  messages not sent yet and returns a typed `BroadcastInfo` result.
+- Variants and bundles: `variants.add`, `variants.update`, `bundles.create` and
+  `bundles.update`, with per-variant optimistic versions and exactly one bundle
+  component added or removed per update. Deep variant price cuts can wait for
+  owner approval.
+- Product files: `items.request_file(item_id, variant_id=)` prompts the owner in
+  Telegram. It carries a fresh idempotency key per call but is never retried
+  automatically, because every call creates a new prompt.
+- Bulk prices: `items.reprice(changes, confirmation=)` previews and confirms up
+  to 100 versioned item-price changes together, or waits for owner approval
+  when a cut is deep.
 - Coupons: `coupons.list(status=, code=, limit=, cursor=)` and `coupons.iter()` (scope
   `coupons:read`); `coupons.create(code, pct_off, max_uses=, per_user_max_uses=,
   expires_at=)` and `coupons.update(code, active=, max_uses=, per_user_max_uses=,
@@ -79,6 +94,8 @@ Writes: categories, items, prices, coupons, support and fulfilment. Requires a s
   redacted from staging failures and logs.
 - Models: `Coupon`, `CouponUses`, `CouponPage`, `CouponAnswer`, `ItemAnswer`,
   `ItemMoveAnswer`, `ItemMoved`, `ItemDeleteAnswer`, `ItemDeleted`.
+- Final write models: `BroadcastInfo`, `Bundle`, `Variant`, `FileRequested`,
+  `RepriceChange`, `Repriced`, `RepriceResult` and their answer models.
 - Support and fulfilment models: `TicketSummary`, `TicketPage`, `TicketMessage`,
   `TicketDetail`, `TicketReplied`, `TicketReplyAnswer`, `TicketClosed`,
   `TicketCloseAnswer`, `DownloadsRestored` and `DownloadsRestoreAnswer`.
@@ -96,8 +113,9 @@ Writes: categories, items, prices, coupons, support and fulfilment. Requires a s
 
 ### Changed
 
-- The bundled contract (`contract/merchant-api-v1.json`) adds the approval read
-  and documents 202 `pending_approval` for deep price cuts and large coupons;
+- The bundled contracts are synchronized to revision 2026-11-04. The merchant
+  API contract adds the approval read and documents 202 `pending_approval` for
+  broadcasts, deep price cuts, large coupons and guarded support replies;
   the contract tests also check every write's body fields and declared idempotency header,
   and that every nullable body field is optional (the client leaves out `None`).
 - CI type-checks the package, the examples and the README's write examples with

@@ -24,6 +24,10 @@ __all__ = [
     "Approval",
     "ApprovalInfo",
     "Attention",
+    "BroadcastAnswer",
+    "BroadcastInfo",
+    "Bundle",
+    "BundleAnswer",
     "BundleComponent",
     "Category",
     "CategoryAnswer",
@@ -40,6 +44,8 @@ __all__ = [
     "DownloadsRestoreAnswer",
     "DownloadsRestored",
     "Effect",
+    "FileRequestAnswer",
+    "FileRequested",
     "HoldsReleaseAnswer",
     "HoldsReleased",
     "ItemAnswer",
@@ -74,6 +80,10 @@ __all__ = [
     "PaymentHealth",
     "PaymentPage",
     "RefundRequest",
+    "RepriceAnswer",
+    "RepriceChange",
+    "RepriceResult",
+    "Repriced",
     "Sales",
     "SalesSummary",
     "StockCounts",
@@ -94,6 +104,8 @@ __all__ = [
     "TicketReplied",
     "TicketReplyAnswer",
     "TicketSummary",
+    "Variant",
+    "VariantAnswer",
     "WriteAnswer",
 ]
 
@@ -189,6 +201,7 @@ class ItemVariant(_Model):
     price_stars: int
     is_active: bool
     file_status: str
+    version: str
 
 
 class BundleComponent(_Model):
@@ -226,6 +239,33 @@ class ItemDetail(_Model):
     """Why publishing would be refused, or ``None``."""
     version: str
     """Changes whenever the title, description or price does."""
+
+
+class Bundle(ItemDetail):
+    """A bundle item after changing its components."""
+
+    warning: Optional[str]
+    """Set while fewer than two items are in the bundle."""
+
+
+class Variant(ItemVariant):
+    """A product variant returned by a variant write."""
+
+    item_id: int
+    licence_note: Optional[str]
+
+
+class BroadcastInfo(_Model):
+    id: int
+    status: str
+    recipients: int
+    pending: int
+    sent: int
+    failed: int
+    blocked: int
+    skipped: int
+    created_at: datetime
+    finished_at: Optional[datetime]
 
 
 # --- coupons ---------------------------------------------------------------
@@ -607,6 +647,49 @@ class ItemDeleteAnswer(WriteAnswer):
 
 class CouponAnswer(WriteAnswer):
     result: Optional[Coupon]  # type: ignore[assignment]
+
+
+class BroadcastAnswer(WriteAnswer):
+    result: Optional[BroadcastInfo]  # type: ignore[assignment]
+
+
+class BundleAnswer(WriteAnswer):
+    result: Optional[Bundle]  # type: ignore[assignment]
+
+
+class VariantAnswer(WriteAnswer):
+    result: Optional[Variant]  # type: ignore[assignment]
+
+
+class FileRequested(_Model):
+    sent: bool
+    item_id: int
+    variant_id: Optional[int]
+
+
+class FileRequestAnswer(WriteAnswer):
+    result: Optional[FileRequested]  # type: ignore[assignment]
+
+
+class RepriceChange(_Model):
+    item_id: int
+    version: str
+    price_stars: int
+
+
+class Repriced(_Model):
+    item_id: int
+    price_stars: int
+    version: str
+    changed: bool
+
+
+class RepriceResult(_Model):
+    items: List[Repriced]
+
+
+class RepriceAnswer(WriteAnswer):
+    result: Optional[RepriceResult]  # type: ignore[assignment]
 
 
 # --- support and fulfilment writes ----------------------------------------

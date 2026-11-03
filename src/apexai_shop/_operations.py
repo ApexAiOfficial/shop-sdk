@@ -45,6 +45,13 @@ OPERATIONS: Dict[str, Operation] = {
     "list_payments": Operation("GET", "/payments", ("cursor",)),
     "sales_summary": Operation("GET", "/reports/summary", ("days",)),
     "list_coupons": Operation("GET", "/coupons", ("status", "code", "limit", "cursor")),
+    "list_reviews": Operation(
+        "GET", "/reviews", ("status", "item_id", "rating", "limit", "cursor")
+    ),
+    "get_review": Operation("GET", "/reviews/{review_id}"),
+    "list_custom_orders": Operation("GET", "/custom-orders", ("status", "limit", "cursor")),
+    "get_custom_order": Operation("GET", "/custom-orders/{request_id}"),
+    "list_membership_plans": Operation("GET", "/membership-plans"),
     # --- writes ------------------------------------------------------------
     "send_broadcast": Operation(
         "POST", "/broadcasts", body=("text",), uses_idempotency_key=True
@@ -166,5 +173,44 @@ OPERATIONS: Dict[str, Operation] = {
         "/orders/{order_id}/restore-downloads",
         body=("downloads",),
         uses_idempotency_key=True,
+    ),
+    "publish_review": Operation(
+        "POST", "/reviews/{review_id}/publish", uses_idempotency_key=True
+    ),
+    "withhold_review": Operation(
+        "POST",
+        "/reviews/{review_id}/withhold",
+        body=("action", "confirmation"),
+        uses_idempotency_key=True,
+    ),
+    "respond_review": Operation(
+        "POST", "/reviews/{review_id}/response", body=("body",), uses_idempotency_key=True
+    ),
+    "clarify_custom_order": Operation(
+        "POST",
+        "/custom-orders/{request_id}/clarify",
+        body=("question", "confirmation"),
+        uses_idempotency_key=True,
+    ),
+    "reject_custom_order": Operation(
+        "POST",
+        "/custom-orders/{request_id}/reject",
+        body=("reason", "confirmation"),
+        uses_idempotency_key=True,
+    ),
+    "set_membership_price": Operation(
+        "POST",
+        "/membership-plans/{plan_id}/price",
+        body=("price_stars", "confirmation"),
+        uses_idempotency_key=True,
+    ),
+    "set_membership_active": Operation(
+        "POST",
+        "/membership-plans/{plan_id}/active",
+        body=("active", "confirmation"),
+        uses_idempotency_key=True,
+    ),
+    "set_version_label": Operation(
+        "POST", "/items/{item_id}/version-label", body=("label",), uses_idempotency_key=True
     ),
 }

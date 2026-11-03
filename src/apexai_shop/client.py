@@ -670,7 +670,7 @@ class Items(_Resource):
 
         Each change carries the item's version. Deep cuts may answer
         :class:`~apexai_shop.PendingApproval` instead of a preview. Needs
-        ``pricing:write``.
+        ``catalog:write`` and ``pricing:write``.
         """
         return self._shop._write(
             "reprice_items",
@@ -1174,7 +1174,10 @@ class Reviews(_Resource):
         rating: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> Iterator[ReviewRow]:
-        """Every review :meth:`list` would page through, following ``next_cursor``."""
+        """Every review :meth:`list` would page through, following ``next_cursor``.
+
+        Needs ``reviews:read``.
+        """
         return self._shop._paginate(
             "list_reviews",
             ReviewPage,
@@ -1291,7 +1294,10 @@ class CustomOrders(_Resource):
     def iter(
         self, *, status: Optional[str] = None, limit: Optional[int] = None
     ) -> Iterator[CustomOrderRow]:
-        """Every request :meth:`list` would page through, following ``next_cursor``."""
+        """Every request :meth:`list` would page through, following ``next_cursor``.
+
+        Needs ``custom_orders:read``.
+        """
         return self._shop._paginate(
             "list_custom_orders", CustomOrderPage, {"status": status, "limit": limit}
         )
@@ -1369,8 +1375,9 @@ class MembershipPlans(_Resource):
     def get(self, plan_id: int) -> MembershipPlanRow:
         """One plan, read from :meth:`list` (the API has no single-plan read).
 
-        Raises :class:`~apexai_shop.NotFoundError` when no plan has that id.
-        Needs ``catalog:read``.
+        Raises :class:`~apexai_shop.NotFoundError` when no plan has that id,
+        with ``status`` ``None`` (no 404 was answered) and ``code``
+        ``not_found``. Needs ``catalog:read``.
         """
         return _core.find_plan(self.list(), plan_id)
 

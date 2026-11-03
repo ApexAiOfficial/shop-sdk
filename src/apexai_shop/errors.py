@@ -152,7 +152,12 @@ class WritesDisabledError(PermissionDeniedError):
 
 
 class NotFoundError(ShopError):
-    """404: no such item or order."""
+    """404: no such item or order.
+
+    ``membership_plans.get`` raises it for an unknown plan id after reading the
+    plan list, so there is no 404: ``status`` is ``None`` and ``code`` is
+    ``not_found``. Tell a missing object apart by ``code``, not ``status``.
+    """
 
 
 class BadRequestError(ShopError):

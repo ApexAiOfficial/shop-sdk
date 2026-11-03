@@ -407,6 +407,7 @@ def test_membership_plans_list_and_get():
     with pytest.raises(NotFoundError) as caught:
         shop.membership_plans.get(6)
     assert caught.value.code == "not_found"
+    assert caught.value.status is None  # raised from the list, not a 404
 
 
 def test_membership_price_previews_then_confirms():
@@ -524,8 +525,9 @@ def test_async_reads_have_parity():
             order = await shop.custom_orders.get(400)
             plans = await shop.membership_plans.list()
             plan = await shop.membership_plans.get(5)
-            with pytest.raises(NotFoundError):
+            with pytest.raises(NotFoundError) as caught:
                 await shop.membership_plans.get(99)
+            assert (caught.value.status, caught.value.code) == (None, "not_found")
             item = await shop.items.get(10)
         return rec, page, queued, every, review, orders, order_rows, order, plans, plan, item
 

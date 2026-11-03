@@ -402,7 +402,7 @@ write raises also carry its `idempotency_key` (see
 | `ApprovalRequiredError` | 403 `approval_required`: refused because the change needs the owner's approval; nothing was queued, so ask the owner to make it in the bot; `reasons` says why (a `PermissionDeniedError`). A `PendingApproval` result, by contrast, is queued and waits for the owner's Approve |
 | `ApprovalTimeoutError` | `PendingApproval.wait()` reached its timeout while the approval was still pending; the queued change may still be approved later |
 | `WritesDisabledError` | 403 `writes_disabled`: changes through the API are off for this store (a `PermissionDeniedError`) |
-| `NotFoundError` | 404: no such item, order or category |
+| `NotFoundError` | 404: no such item, order or category. `membership_plans.get` raises it without a 404 for an unknown plan id (it reads the plan list; `status` is `None`, `code` is `not_found`) |
 | `BadRequestError` | 400 or 422: a parameter was refused (for writes also `nothing_to_change`, `not_empty`, `idempotency_key_reused`); `fields` names the offending parameters |
 | `ConflictError` | 409: the change conflicts with the store as it is now; for `conflict`, `current` holds the current object |
 | `WrongStateError` | 409 `wrong_state`: the review or custom order is not in a state this change applies to; `current` or, for a custom order, `current_status` says where it is now (a `ConflictError`) |
@@ -498,7 +498,10 @@ Found a vulnerability? See [SECURITY.md](SECURITY.md).
 This release targets **contract version 1** of the merchant API
 (`/api/merchant/v1`); the contract ships in
 [`contract/merchant-api-v1.json`](contract/merchant-api-v1.json) and the test
-suite checks the client against it. Within version 1 the API only makes
+suite checks the client against it. The scope each operation needs comes from
+[`contract/merchant-mcp-v1.json`](contract/merchant-mcp-v1.json), the store's
+MCP tool contract; the tests check the scopes the method docstrings name
+against it. Within version 1 the API only makes
 additive changes (new fields, new endpoints, new enum values). The models
 ignore unknown fields and type enum-like values as plain strings, so existing
 code keeps working when the API grows. A breaking change would ship as a new

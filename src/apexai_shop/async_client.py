@@ -643,7 +643,10 @@ class AsyncItems(_AsyncResource):
         confirmation: Union[str, ConfirmationInfo, None] = None,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[RepriceResult]:
-        """Preview or apply up to 100 item prices in one two-step write."""
+        """Preview or apply up to 100 item prices in one two-step write.
+
+        Needs ``catalog:write`` and ``pricing:write``.
+        """
         return await self._shop._write(
             "reprice_items",
             RepriceAnswer,
@@ -1110,7 +1113,10 @@ class AsyncReviews(_AsyncResource):
         rating: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> AsyncIterator[ReviewRow]:
-        """Every review :meth:`list` would page through, following ``next_cursor``."""
+        """Every review :meth:`list` would page through, following ``next_cursor``.
+
+        Needs ``reviews:read``.
+        """
         return self._shop._paginate(
             "list_reviews",
             ReviewPage,
@@ -1227,7 +1233,10 @@ class AsyncCustomOrders(_AsyncResource):
     def iter(
         self, *, status: Optional[str] = None, limit: Optional[int] = None
     ) -> AsyncIterator[CustomOrderRow]:
-        """Every request :meth:`list` would page through, following ``next_cursor``."""
+        """Every request :meth:`list` would page through, following ``next_cursor``.
+
+        Needs ``custom_orders:read``.
+        """
         return self._shop._paginate(
             "list_custom_orders", CustomOrderPage, {"status": status, "limit": limit}
         )
@@ -1305,8 +1314,9 @@ class AsyncMembershipPlans(_AsyncResource):
     async def get(self, plan_id: int) -> MembershipPlanRow:
         """One plan, read from :meth:`list` (the API has no single-plan read).
 
-        Raises :class:`~apexai_shop.NotFoundError` when no plan has that id.
-        Needs ``catalog:read``.
+        Raises :class:`~apexai_shop.NotFoundError` when no plan has that id,
+        with ``status`` ``None`` (no 404 was answered) and ``code``
+        ``not_found``. Needs ``catalog:read``.
         """
         return _core.find_plan(await self.list(), plan_id)
 

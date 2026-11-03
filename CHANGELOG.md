@@ -31,7 +31,7 @@ and custom orders need a token minted with their new scopes.
   `PendingApproval`. A rejection cannot be undone. No buyer id is returned.
 - Membership plans: `membership_plans.list()` and `membership_plans.get(id)`
   (`catalog:read`; `get` reads the list and raises `NotFoundError` for an
-  unknown id), `membership_plans.set_price(id, price_stars, confirmation=)`
+  unknown id, with `status` `None` and `code` `not_found`), `membership_plans.set_price(id, price_stars, confirmation=)`
   (two-step, `catalog:write` and `pricing:write`; live members keep their
   locked price, and a cut to under half answers `PendingApproval`) and
   `membership_plans.set_active(id, active, confirmation=)` (`catalog:write`; on
@@ -55,6 +55,14 @@ and custom orders need a token minted with their new scopes.
 - The bundled merchant API and webhook contracts are synchronized to revision
   2026-11-05 (53 operations). The contract tests check every write answer's
   typed `result` against its schema and pin which writes preview first.
+- `contract/merchant-mcp-v1.json`, the store's MCP tool contract, is bundled
+  too. A contract test checks the scopes every method docstring names against
+  it (plus `pricing:write` where the API contract asks for it), and that every
+  method added in this release names them. `items.reprice` now documents
+  `catalog:write` as well as `pricing:write`.
+- `NotFoundError` documents that `membership_plans.get` raises it without a
+  request for an unknown plan id: `status` is `None` and `code` is
+  `not_found`.
 
 ## [0.3.0] - Unreleased
 

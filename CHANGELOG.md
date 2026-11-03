@@ -3,6 +3,59 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - Unreleased
+
+Review moderation, custom-order questions and rejections, membership plans and
+product version labels. Requires a store on API revision 2026-11-05; reviews
+and custom orders need a token minted with their new scopes.
+
+### Added
+
+- Reviews (scopes `reviews:read`, `reviews:write`): `reviews.list(status=,
+  item_id=, rating=, limit=, cursor=)` and `reviews.iter(...)`, with `status`
+  `queue` (the default, oldest first), `public`, `hidden`, `removed` or `all`;
+  `reviews.queue(...)`, every review waiting for moderation; `reviews.get(id)`
+  with the store's response, the history (roles, never ids) and the item's
+  rating; `reviews.publish(id)`, which also undoes a reject and shows a hidden
+  review (`PendingApproval` when the review holds a link or contact details);
+  `reviews.withhold(id, "reject" | "hide", confirmation=)`, two-step when the
+  item's rating counts the review; and `reviews.respond(id, body)`, whose result
+  holds the response's length, never its text (`PendingApproval` with contact
+  details). Reviews never carry a buyer or order id.
+- Custom orders (scopes `custom_orders:read`, `custom_orders:write`):
+  `custom_orders.list(status=, limit=, cursor=)` and `custom_orders.iter(...)`
+  (`open` by default, `all`, or one status), `custom_orders.get(id)`, and the
+  two-step `custom_orders.clarify(id, question, confirmation=)` and
+  `custom_orders.reject(id, reason, confirmation=)`. Both message the buyer at
+  once and report `notified`; a text with a link or contact details answers
+  `PendingApproval`. A rejection cannot be undone. No buyer id is returned.
+- Membership plans: `membership_plans.list()` and `membership_plans.get(id)`
+  (`catalog:read`; `get` reads the list and raises `NotFoundError` for an
+  unknown id), `membership_plans.set_price(id, price_stars, confirmation=)`
+  (two-step, `catalog:write` and `pricing:write`; live members keep their
+  locked price, and a cut to under half answers `PendingApproval`) and
+  `membership_plans.set_active(id, active, confirmation=)` (`catalog:write`; on
+  at once, off two-step).
+- `items.set_version_label(item_id, label)` (`catalog:write`; `""` clears it)
+  and `ItemDetail.version_label`. The label is not part of the item's
+  `version`, so an item edit prepared before stays valid.
+- Models: `ReviewRow`, `ReviewPage`, `ReviewDetail`, `ReviewEvent`,
+  `ReviewResponseText`, `Rating`, `ReviewState`, `ReviewStateAnswer`,
+  `ReviewResponseResult`, `ReviewResponseAnswer`, `CustomOrderRow`,
+  `CustomOrderPage`, `CustomOrderDetail`, `CustomOrderQuote`,
+  `CustomOrderNotice`, `CustomOrderState`, `CustomOrderAnswer`,
+  `MembershipPlanRow`, `MembershipPlanList`, `MembershipPlanAnswer`,
+  `VersionLabel` and `VersionLabelAnswer`.
+- `WrongStateError` (409 `wrong_state`) and `NotPublishableError` (409
+  `not_publishable`), both `ConflictError`s; `ConflictError.current_status`
+  holds a custom order's status when a `wrong_state` refusal names it.
+
+### Changed
+
+- The bundled merchant API and webhook contracts are synchronized to revision
+  2026-11-05 (53 operations). The contract tests check every write answer's
+  typed `result` against its schema and pin which writes preview first.
+
 ## [0.3.0] - Unreleased
 
 Completes the merchant API write surface: catalog, prices, coupons, licence

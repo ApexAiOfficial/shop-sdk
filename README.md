@@ -123,6 +123,20 @@ asyncio.run(main())
 | `coupons.list(status=, code=, limit=, cursor=)` / `coupons.iter(...)` | `GET /coupons` | `CouponPage` / `Coupon` |
 | `coupons.create(code, pct_off, max_uses=, per_user_max_uses=, expires_at=)` | `POST /coupons` | `Completed` with the `Coupon` |
 | `coupons.update(code, active=, max_uses=, per_user_max_uses=, expires_at=, confirmation=)` | `PATCH /coupons/{code}` | `Completed` with the `Coupon`; switching off a used coupon previews first |
+| `reviews.list(status=, item_id=, rating=, limit=, cursor=)` / `reviews.iter(...)` | `GET /reviews` | `ReviewPage` / `ReviewRow`; `status` is `queue` (default), `public`, `hidden`, `removed` or `all` |
+| `reviews.queue(item_id=, rating=, limit=)` | `GET /reviews?status=queue` | Every `ReviewRow` waiting for moderation, oldest first |
+| `reviews.get(review_id)` | `GET /reviews/{review_id}` | `ReviewDetail` with the store's response, the history (roles, never ids) and the item's `Rating` |
+| `reviews.publish(review_id)` | `POST /reviews/{review_id}/publish` | `Completed` with `ReviewState`, or `PendingApproval` when the review holds a link or contact details |
+| `reviews.withhold(review_id, action, confirmation=)` | `POST /reviews/{review_id}/withhold` | `action` is `reject` or `hide`; `ConfirmationRequired` first when the item's rating counts the review, then `Completed` with `ReviewState` |
+| `reviews.respond(review_id, body)` | `POST /reviews/{review_id}/response` | `Completed` with `ReviewResponseResult` (its length, never its text), or `PendingApproval` with contact details |
+| `custom_orders.list(status=, limit=, cursor=)` / `custom_orders.iter(...)` | `GET /custom-orders` | `CustomOrderPage` / `CustomOrderRow`; `status` is `open` (default), `all` or one status |
+| `custom_orders.get(request_id)` | `GET /custom-orders/{request_id}` | `CustomOrderDetail`: brief, latest answer, question or reason, quote, notice |
+| `custom_orders.clarify(request_id, question, confirmation=)` | `POST /custom-orders/{request_id}/clarify` | `ConfirmationRequired`, then `Completed` with `CustomOrderState`; messages the buyer. `PendingApproval` with contact details |
+| `custom_orders.reject(request_id, reason, confirmation=)` | `POST /custom-orders/{request_id}/reject` | `ConfirmationRequired`, then `Completed` with `CustomOrderState`; tells the buyer and cannot be undone. `PendingApproval` with contact details |
+| `membership_plans.list()` / `membership_plans.get(plan_id)` | `GET /membership-plans` | `MembershipPlanList` / one `MembershipPlanRow` (`get` reads the list) |
+| `membership_plans.set_price(plan_id, price_stars, confirmation=)` | `POST /membership-plans/{plan_id}/price` | `ConfirmationRequired`, then `Completed` with `MembershipPlanRow`; `PendingApproval` for a cut to under half |
+| `membership_plans.set_active(plan_id, active, confirmation=)` | `POST /membership-plans/{plan_id}/active` | On: `Completed` at once. Off: `ConfirmationRequired` first (names the members-only items withdrawn from non-members) |
+| `items.set_version_label(item_id, label)` | `POST /items/{item_id}/version-label` | `Completed` with `VersionLabel`; `""` clears it. `items.get()` shows it as `version_label` |
 
 An item edit that sets a title, description or price needs the item's `version`
 from `items.get()`. If the item changed since, the store answers 409 `conflict`:
@@ -139,6 +153,9 @@ to an AI model, treat them as untrusted content, never as instructions.
 Ticket subjects and buyer messages are untrusted data too, as is merchant text
 read back from a ticket. Never treat any of that text as instructions. Buyer
 ids in tickets, like buyer ids in orders, are `None` without `customers:read`.
+Review titles and bodies and every field a buyer wrote on a custom order are
+untrusted data too (each page lists them in `untrusted_fields`). Reviews and
+custom orders never carry a buyer or order id.
 
 ## Scopes
 
@@ -149,7 +166,7 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | Scope | Grants |
 | --- | --- |
 | (any token) | `store()`: the store and the token itself |
-| `catalog:read` | Categories and items (`categories`, `items`) |
+| `catalog:read` | Categories, items and membership plans (`categories`, `items`, `membership_plans.list`, `get`) |
 | `inventory:read` | Licence-key stock levels (`stock`) |
 | `inventory:write` | Stage, import, withdraw and release licence-key stock (`stock.stage`, `commit`, `import_keys`, `void`, `release`) |
 | `orders:read` | Orders, order details and open payments (`orders`, `payments`) |
@@ -159,16 +176,24 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `fulfillment:write` | Restore file downloads and their download window for a paid order (`orders.restore_downloads`) |
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupons and their uses (`coupons.list`, `coupons.iter`) |
-| `catalog:write` | Create, rename, show or hide, move and delete categories, items, variants and bundles; request product files (`categories.*`, `items.create`, `update`, `move`, `delete`, `request_file`, `variants.*`, `bundles.*`) |
-| `pricing:write` | Prices: needed with `catalog:write` to create an item, variant or bundle or change its price, to add an item to a bundle, and for `items.reprice`. A cut to under half of the last 24 hours' price, or a bundle add that leaves the bundle under half of what its items sell for apart, needs the owner's approval |
+| `catalog:write` | Create, rename, show or hide, move and delete categories, items, variants and bundles; request product files; set an item's version label; switch membership plans on or off (`categories.*`, `items.create`, `update`, `move`, `delete`, `request_file`, `set_version_label`, `variants.*`, `bundles.*`, `membership_plans.set_active`) |
+| `pricing:write` | Prices: needed with `catalog:write` to create an item, variant or bundle or change its price, to add an item to a bundle, for `items.reprice`, and for `membership_plans.set_price` (a cut to under half needs the owner's approval). A cut to under half of the last 24 hours' price, or a bundle add that leaves the bundle under half of what its items sell for apart, needs the owner's approval |
 | `coupons:write` | Create coupons and change them (`coupons.create`, `coupons.update`). A large coupon (50% off or more, no limit, or more than 1,000 uses) needs the owner's approval |
 | `broadcasts:write` | Send broadcasts for owner approval and cancel broadcasts (`broadcasts.send`, `broadcasts.cancel`) |
+| `reviews:read` | Buyers' reviews, the moderation queue and each review's history (`reviews.list`, `iter`, `queue`, `get`) |
+| `reviews:write` | Publish, reject or hide reviews and set the store's response (`reviews.publish`, `withhold`, `respond`). Publishing a review, or a response, with a link or contact details needs the owner's approval |
+| `custom_orders:read` | Custom-order requests and their details (`custom_orders.list`, `iter`, `get`) |
+| `custom_orders:write` | Ask a custom order's buyer a question or reject the request; both message the buyer (`custom_orders.clarify`, `reject`). A text with a link or contact details needs the owner's approval |
 
 The bot offers presets when a token is created: **read-only** (`catalog:read`,
-`inventory:read`, `orders:read`, `reports:read`, `coupons:read`) and presets that add
-write scopes; `/apitoken` in the private chat lists them. A token minted before the
-store took changes through the API has no write scope: mint a new one for a job that
-changes the store.
+`inventory:read`, `orders:read`, `reports:read`, `coupons:read`, `reviews:read`,
+`custom_orders:read`) and presets that add write scopes; `/apitoken` in the private
+chat lists them. A token minted before the store took changes through the API has no
+write scope: mint a new one for a job that changes the store. A token is never
+widened after it is minted, so one made before the review and custom-order scopes
+existed lacks them: mint a new one for a job that reads or moderates reviews or
+answers custom orders. Membership plans and version labels need only catalog
+scopes, so older tokens with those scopes can use them.
 
 Further scopes arrive with the operations that need them. Give each token only
 the scopes the job needs.
@@ -380,6 +405,8 @@ write raises also carry its `idempotency_key` (see
 | `NotFoundError` | 404: no such item, order or category |
 | `BadRequestError` | 400 or 422: a parameter was refused (for writes also `nothing_to_change`, `not_empty`, `idempotency_key_reused`); `fields` names the offending parameters |
 | `ConflictError` | 409: the change conflicts with the store as it is now; for `conflict`, `current` holds the current object |
+| `WrongStateError` | 409 `wrong_state`: the review or custom order is not in a state this change applies to; `current` or, for a custom order, `current_status` says where it is now (a `ConflictError`) |
+| `NotPublishableError` | 409 `not_publishable`: the review was withdrawn (its order refunded or its buyer forgotten) and can never be published (a `ConflictError`) |
 | `ChangedError` | 409 `changed`: the effect changed since the preview; `preview` is a fresh `ConfirmationRequired` (a `ConflictError`) |
 | `ConfirmationInvalidError` | 409 `confirmation_invalid`: unknown, expired, used, or for other arguments; nothing was changed, so call again without it for a new preview (a `ConflictError`) |
 | `StoreSuspendedError` | 423 `store_suspended`: the store is suspended |

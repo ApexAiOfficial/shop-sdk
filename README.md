@@ -18,6 +18,10 @@ The merchant API is part of the **Business plan**. Reading needs a token with
 read scopes; changing the store needs a write scope such as `catalog:write`
 (see [Changing the store](#changing-the-store)).
 
+**Availability (2026-11-04):** no ApexAi-operated store serves the merchant API yet. A store needs Shop Bot
+0.8.0 or later (not yet released) with the merchant API switched on. Until then, this SDK has nothing to
+connect to.
+
 ## Get a token
 
 1. Open a **private chat** with your store's bot (as the store owner).
@@ -36,7 +40,7 @@ export SHOP_API_TOKEN="<the token the bot showed you>"
 ## Install
 
 ```sh
-pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.1.0"
+pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.2.0"
 ```
 
 ## Quickstart
@@ -164,11 +168,16 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `coupons:write` | Create coupons and change them (`coupons.create`, `coupons.update`). A large coupon (50% off or more, no limit, or more than 1,000 uses) needs the owner's approval |
 | `broadcasts:write` | Send broadcasts for owner approval and cancel broadcasts (`broadcasts.send`, `broadcasts.cancel`) |
 
-The bot offers presets when a token is created: **read-only** (`catalog:read`,
-`inventory:read`, `orders:read`, `reports:read`, `coupons:read`) and presets that add
-write scopes; `/apitoken` in the private chat lists them. A token minted before the
-store took changes through the API has no write scope: mint a new one for a job that
-changes the store.
+The bot offers four presets when a token is created:
+- **Read-only:** `catalog:read`, `inventory:read`, `orders:read`, `reports:read`, `coupons:read`.
+- **Support:** `catalog:read`, `orders:read`, plus the support and delivery scopes. It has no
+  `customers:read`, so buyer ids stay hidden.
+- **Catalog and stock:** Read-only plus the catalog, price and stock write scopes.
+- **Full:** every scope, including `customers:read`, coupon writes and broadcasts.
+
+A token minted before the store took changes through the API has no write scope: mint a new one for a
+job that changes the store. Refunds are never available through the API, whatever the token; they stay in
+the store's chat and admin app.
 
 Further scopes arrive with the operations that need them. Give each token only
 the scopes the job needs.

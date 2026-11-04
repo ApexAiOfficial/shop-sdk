@@ -9,6 +9,10 @@ Completes the merchant API write surface: catalog, prices, coupons, licence
 keys, support, fulfilment, broadcasts and product delivery. Requires a store
 whose merchant API takes changes.
 
+### Security
+
+- A plain `http://` base URL is refused unless it points at this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost`), so a token never crosses the network in clear text.
+
 ### Added
 
 - Store-changing writes send a JSON body and an `Idempotency-Key` header: a random key per call (or

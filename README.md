@@ -13,7 +13,11 @@ or an AI agent that keeps an eye on the shop.
 - Automatic pagination, retries with Retry-After, and clear exceptions.
 - Only two dependencies: `httpx` and `pydantic`. Python 3.10+.
 
-The merchant API is part of the **Business plan**. API version 1 is read-only.
+The merchant API is part of the **Business plan**. This SDK release (0.2.0) only reads.
+
+**Availability (2026-11-04):** no ApexAi-operated store serves the merchant API yet. A store needs Shop Bot
+0.8.0 or later (not yet released) with the merchant API switched on. Until then, this SDK has nothing to
+connect to.
 
 ## Get a token
 
@@ -33,7 +37,7 @@ export SHOP_API_TOKEN="<the token the bot showed you>"
 ## Install
 
 ```sh
-pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.1.0"
+pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.2.0"
 ```
 
 ## Quickstart
@@ -114,11 +118,15 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `reports:read` | Sales reports and what needs attention (`reports.summary`, `attention()`) |
 | `coupons:read` | Coupon data (no endpoint in this SDK version yet) |
 
-The bot offers three presets when a token is created: **read-only** (`catalog:read`,
-`inventory:read`, `orders:read`, `reports:read`, `coupons:read`), **operations** (adds
-`customers:read` and the support, catalog, stock, coupon and delivery scopes later API
-versions use) and **full** (adds broadcasts and refunds, each waiting for the owner's
-approval in Telegram). Version 1 only reads.
+The bot offers four presets when a token is created:
+- **Read-only:** `catalog:read`, `inventory:read`, `orders:read`, `reports:read`, `coupons:read`.
+- **Support:** `catalog:read`, `orders:read`, plus the support and delivery scopes. It has no
+  `customers:read`, so buyer ids stay hidden.
+- **Catalog and stock:** Read-only plus the catalog, price and stock write scopes.
+- **Full:** every scope, including `customers:read`, coupon writes and broadcasts.
+
+Refunds are never available through the API, whatever the token; they stay in the store's chat and admin
+app. This SDK release uses only the read scopes. The write scopes are for later SDK versions.
 
 Further scopes may be added as the API grows. Give each token only the scopes
 the job needs.

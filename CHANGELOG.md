@@ -52,6 +52,8 @@ and custom orders need a token minted with their new scopes.
 
 ### Changed
 
+- The bundled contracts (synced 2026-11-04) now list `update_bundle`'s approval answer, which the SDK already handled, and the `beta` store tier. `StoreInfo.tier` stays a plain string, so a new tier never breaks parsing.
+
 - The bundled merchant API and webhook contracts are synchronized to revision
   2026-11-05 (53 operations). The contract tests check every write answer's
   typed `result` against its schema and pin which writes preview first.

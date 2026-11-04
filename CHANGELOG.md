@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-11-04
 
 Completes the merchant API write surface: catalog, prices, coupons, licence
 keys, support, fulfilment, broadcasts and product delivery. Requires a store

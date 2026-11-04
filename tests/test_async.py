@@ -11,7 +11,7 @@ import pytest
 from apexai_shop import AsyncShop, BadRequestError, ConnectionError, RateLimitError, Shop, models
 from conftest import BASE_URL, PREFIX, SAMPLES, TOKEN, make_async_shop, make_shop
 
-RESOURCES = ["categories", "items", "stock", "orders", "payments", "reports"]
+RESOURCES = ["approvals", "categories", "items", "stock", "orders", "payments", "reports"]
 
 
 def _public_methods(obj):
@@ -53,6 +53,7 @@ def test_every_method_hits_its_path():
         async with shop:
             assert isinstance(await shop.store(), models.StoreResponse)
             assert isinstance(await shop.attention(), models.Attention)
+            assert isinstance(await shop.approvals.get(12), models.Approval)
             assert isinstance(await shop.categories.list(), models.CategoryPage)
             assert isinstance(await shop.items.list(q="x"), models.ItemPage)
             assert isinstance(await shop.items.get(10), models.ItemDetail)
@@ -67,6 +68,7 @@ def test_every_method_hits_its_path():
     assert [r.url.path[len(PREFIX):] for r in rec.requests] == [
         "/store",
         "/attention",
+        "/approvals/12",
         "/categories",
         "/items",
         "/items/10",
@@ -76,9 +78,9 @@ def test_every_method_hits_its_path():
         "/payments",
         "/reports/summary",
     ]
-    assert rec.requests[3].url.params["q"] == "x"
-    assert rec.requests[6].url.params["summary"] == "true"
-    assert rec.requests[9].url.params["days"] == "90"
+    assert rec.requests[4].url.params["q"] == "x"
+    assert rec.requests[7].url.params["summary"] == "true"
+    assert rec.requests[10].url.params["days"] == "90"
     for request in rec.requests:
         assert request.headers["authorization"] == f"Bearer {TOKEN}"
         assert request.headers["accept"] == "application/json"

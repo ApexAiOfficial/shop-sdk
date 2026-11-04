@@ -4,26 +4,58 @@ Every error the API returns becomes a :class:`ShopError` subclass carrying the
 HTTP status, the stable error code from the response body (for example
 ``unauthorized``, ``insufficient_scope`` or ``not_found``), a readable message
 and the request id when the server sent one. Errors never contain the token.
+
+Refused writes add a few classes keyed on their stable codes:
+:class:`ConflictError` (409, with :class:`ChangedError` and
+:class:`ConfirmationInvalidError`), :class:`StoreSuspendedError` (423),
+:class:`DailyCapError` (429 ``daily_cap``), :class:`ApprovalRequiredError` and
+:class:`WritesDisabledError` (403).
+
+Every error from an idempotent write carries that call's ``idempotency_key``. A
+:class:`ConnectionError`, a :class:`ServerError` or an ``invalid_response``
+does not say whether the change was made: repeat the same call with
+``idempotency_key=err.idempotency_key`` and the API answers the stored result
+if it was, or makes the change once if it was not.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .results import ConfirmationRequired
 
 __all__ = [
     "ShopError",
     "AuthenticationError",
     "PermissionDeniedError",
+    "ApprovalRequiredError",
+    "ApprovalTimeoutError",
+    "WritesDisabledError",
     "NotFoundError",
     "BadRequestError",
+    "ConflictError",
+    "ConfirmKeyDeliveryError",
+    "ChangedError",
+    "ConfirmationInvalidError",
+    "StoreSuspendedError",
     "RateLimitError",
+    "DailyCapError",
     "ServerError",
     "ConnectionError",
 ]
 
 
 class ShopError(Exception):
-    """Base class for every error raised by the client."""
+    """Base class for every error raised by the client.
+
+    ``idempotency_key`` is the ``Idempotency-Key`` the failed write sent
+    (``None`` for reads and non-idempotent staging): pass it to the same call
+    to retry it safely.
+    """
+
+    idempotency_key: Optional[str] = None
+    batches_committed: Optional[int] = None
 
     def __init__(
         self,
@@ -43,13 +75,21 @@ class ShopError(Exception):
         text = f"{head}: {self.message}"
         if self.request_id:
             text += f" (request id {self.request_id})"
+        if self.batches_committed is not None:
+            text += (
+                f" [licence-key import stopped after {self.batches_committed} "
+                "committed batch(es)]"
+            )
         return text
 
     def __repr__(self) -> str:
-        return (
+        text = (
             f"{type(self).__name__}(status={self.status!r}, code={self.code!r}, "
-            f"message={self.message!r}, request_id={self.request_id!r})"
+            f"message={self.message!r}, request_id={self.request_id!r}"
         )
+        if self.batches_committed is not None:
+            text += f", batches_committed={self.batches_committed!r}"
+        return text + ")"
 
 
 class AuthenticationError(ShopError):
@@ -57,7 +97,55 @@ class AuthenticationError(ShopError):
 
 
 class PermissionDeniedError(ShopError):
-    """403: the token lacks the scope this operation needs."""
+    """403: the token lacks the scope this operation needs (``insufficient_scope``).
+
+    :class:`ApprovalRequiredError` and :class:`WritesDisabledError` are the
+    other 403 answers a write can get.
+    """
+
+
+class ApprovalRequiredError(PermissionDeniedError):
+    """403 ``approval_required``: refused, because this change needs the store owner's approval.
+
+    Nothing was changed and nothing was queued. ``reasons`` lists why, in the
+    server's words: ask the store owner to make the change in the bot. (A
+    :class:`~apexai_shop.PendingApproval` result is different: the change was
+    queued and waits for the owner to tap Approve in Telegram.)
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        reasons: Optional[List[str]] = None,
+    ) -> None:
+        self.reasons: List[str] = list(reasons or [])
+        super().__init__(status, code, message, request_id)
+
+    def __str__(self) -> str:
+        text = super().__str__()
+        if self.reasons:
+            text += f" [reasons: {'; '.join(self.reasons)}]"
+        return text
+
+
+class ApprovalTimeoutError(ShopError):
+    """A queued approval was still pending when ``PendingApproval.wait`` timed out."""
+
+    def __init__(self, approval_id: int, timeout: float) -> None:
+        self.approval_id = approval_id
+        self.timeout = timeout
+        super().__init__(
+            None,
+            "approval_timeout",
+            f"Approval {approval_id} is still pending after {timeout:g} seconds.",
+        )
+
+
+class WritesDisabledError(PermissionDeniedError):
+    """403 ``writes_disabled``: changes through the API are switched off for this store."""
 
 
 class NotFoundError(ShopError):
@@ -89,6 +177,74 @@ class BadRequestError(ShopError):
         return text
 
 
+class ConflictError(ShopError):
+    """409: the change conflicts with the store's current state.
+
+    For code ``conflict`` (an edit based on an outdated version), ``current``
+    holds the object as it is now, so you can show it and try again. Other
+    409 codes (``idempotency_in_progress`` once the client's retries are
+    spent, and codes newer than this client) raise this class too, with
+    ``current`` set to ``None``.
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        current: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        self.current = current
+        super().__init__(status, code, message, request_id)
+
+
+class ChangedError(ConflictError):
+    """409 ``changed``: the effect changed between the preview and the confirmation.
+
+    Nothing was changed and the old confirmation is spent. ``preview`` is a
+    fresh :class:`~apexai_shop.ConfirmationRequired` for the same operation
+    and arguments: show the user its new ``effect`` and call
+    ``preview.confirm()`` only if they agree again. Under
+    :class:`~apexai_shop.AsyncShop` it is an
+    :class:`~apexai_shop.AsyncConfirmationRequired`, whose ``confirm()`` must
+    be awaited; check ``isinstance(err.preview, AsyncConfirmationRequired)``
+    so a type checker knows it too.
+    """
+
+    def __init__(
+        self,
+        status: Optional[int],
+        code: str,
+        message: str,
+        request_id: Optional[str] = None,
+        preview: "Optional[ConfirmationRequired[Any]]" = None,
+    ) -> None:
+        self.preview = preview
+        super().__init__(status, code, message, request_id)
+
+
+class ConfirmationInvalidError(ConflictError):
+    """409 ``confirmation_invalid``: the confirmation is unknown, expired, used, or for other arguments.
+
+    This call changed nothing. Call the operation again without a
+    confirmation for a new preview, and show the user its effect.
+    """
+
+
+class ConfirmKeyDeliveryError(ConflictError):
+    """409 ``confirm_key_delivery``: importing would permanently turn on key delivery.
+
+    The staged import remains usable. Call :meth:`stock.commit` again with
+    ``enable_key_delivery=True`` only after the merchant explicitly agrees;
+    :meth:`stock.import_keys` takes the same opt-in flag.
+    """
+
+
+class StoreSuspendedError(ShopError):
+    """423 ``store_suspended``: the store is suspended, so this change is refused."""
+
+
 class RateLimitError(ShopError):
     """429: too many requests. ``retry_after`` is in seconds, when known."""
 
@@ -102,6 +258,14 @@ class RateLimitError(ShopError):
     ) -> None:
         self.retry_after = retry_after
         super().__init__(status, code, message, request_id)
+
+
+class DailyCapError(RateLimitError):
+    """429 ``daily_cap``: the token spent a rolling 24-hour allowance of changes.
+
+    Never retried automatically. ``retry_after`` is the number of seconds
+    until the allowance has room again, when the server says.
+    """
 
 
 class ServerError(ShopError):

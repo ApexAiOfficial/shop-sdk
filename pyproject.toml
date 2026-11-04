@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "apexai-shop"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python client for the Shop Bot merchant API, by ApexAi."
 readme = "README.md"
 license = "Apache-2.0"
@@ -23,7 +23,7 @@ classifiers = [
 dependencies = ["httpx>=0.27,<1", "pydantic>=2.6,<3"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "mypy>=1.10"]
 
 [project.urls]
 Homepage = "https://github.com/ApexAiOfficial/shop-sdk"
@@ -38,3 +38,8 @@ include = ["src/apexai_shop", "contract", "tests", "README.md", "LICENSE", "CHAN
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+files = ["src/apexai_shop", "examples", "tests/typecheck"]

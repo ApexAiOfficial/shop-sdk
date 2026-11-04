@@ -36,6 +36,28 @@ def test_reads_base_url_and_token_from_env(monkeypatch):
         shop.close()
 
 
+@pytest.mark.parametrize(
+    "url",
+    ["http://your-store.example/api/merchant/v1", "http://10.0.0.5:8081/api/merchant/v1", "ftp://store.example/", "store.example"],
+)
+def test_a_token_never_crosses_the_network_in_clear_text(url):
+    with pytest.raises(ValueError, match="https://"):
+        Shop(url, TOKEN)
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["http://127.0.0.1:8197/api/merchant/v1", "http://localhost:8197/api/merchant/v1", "http://[::1]:8197/api/merchant/v1",
+     "http://dev.localhost:8197/api/merchant/v1"],
+)
+def test_plain_http_is_allowed_for_a_store_on_this_machine(url):
+    shop = Shop(url, TOKEN)
+    try:
+        assert shop.base_url == url
+    finally:
+        shop.close()
+
+
 def test_missing_base_url_names_env_var(monkeypatch):
     monkeypatch.delenv("SHOP_API_URL", raising=False)
     monkeypatch.setenv("SHOP_API_TOKEN", TOKEN)

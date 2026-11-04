@@ -36,9 +36,88 @@ SALES = {
     "live_members": 0,
 }
 
+CATEGORY = {"id": 1, "title": "Guides", "is_active": True, "items": 4, "hidden_items": 1}
+
+COUPON = {
+    "code": "SPRING10",
+    "pct_off": 10,
+    "is_active": True,
+    "max_uses": 100,
+    "per_user_max_uses": 1,
+    "expires_at": "2026-12-01T00:00:00Z",
+    "created_at": "2026-11-01T09:00:00Z",
+    "uses": {"paid": 3, "open_checkouts": 1},
+}
+
+BROADCAST = {
+    "id": 30,
+    "status": "sending",
+    "recipients": 25,
+    "pending": 20,
+    "sent": 5,
+    "failed": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "created_at": "2026-11-03T12:00:00Z",
+    "finished_at": None,
+}
+
+VARIANT = {
+    "id": 20,
+    "item_id": 10,
+    "label": "Personal",
+    "price_stars": 300,
+    "is_active": False,
+    "file_status": "item_file",
+    "licence_note": None,
+    "version": "0123456789abcdef",
+}
+
+APPROVAL = {
+    "id": 12,
+    "operation": "update_item",
+    "target": "item:10",
+    "status": "pending",
+    "effect": {"summary": "Cut Guide's price from 300 to 100 Stars.", "details": {}},
+    "reasons": ["price_cut_over_50_percent"],
+    "created_at": "2026-11-02T12:00:00Z",
+    "expires_at": "2026-11-02T12:15:00Z",
+    "decided_at": None,
+    "result": None,
+    "error": None,
+}
+
+
+def answer(status: str = "done", **fields: Any) -> Dict[str, Any]:
+    """A write's envelope: ``done`` unless ``status`` says otherwise, every field present."""
+    body: Dict[str, Any] = {
+        "status": status,
+        "replayed": False,
+        "noop": False,
+        "result": None,
+        "confirmation": None,
+        "approval": None,
+        "effect": None,
+        "next": None,
+    }
+    body.update(fields)
+    return body
+
+
+def preview(confirmation_id: str = "conf_abc123", summary: str = "Delete the category Guides.") -> Dict[str, Any]:
+    """A ``confirmation_required`` envelope, as a two-step write's first call answers."""
+    return answer(
+        "confirmation_required",
+        confirmation={"id": confirmation_id, "expires_at": "2026-11-02T12:05:00Z"},
+        effect={"summary": summary, "details": {"category_id": 1, "title": "Guides"}},
+        next="Show the user this effect; call delete_category again with this confirmation only after they agree.",
+    )
+
+
 SAMPLES: Dict[str, Any] = {
+    "get_approval": APPROVAL,
     "get_store": {
-        "api_version": "1", "api_revision": "2026-11-02",
+        "api_version": "1", "api_revision": "2026-11-04",
         "store": {"name": "Demo Store", "tier": "business", "currency": "XTR"},
         "token": {
             "id": 7,
@@ -100,6 +179,16 @@ SAMPLES: Dict[str, Any] = {
         ],
         "next_cursor": None,
     },
+    "get_item_stock": {
+        "item_id": 10,
+        "title": "Guide",
+        "sells_keys": True,
+        "levels": {"available": 5, "reserved": 0, "sold": 2, "revoked": 0, "void": 0},
+        "voidable": 5,
+        "holds": {"live": 0, "lapsed": 0},
+        "low_stock_threshold": 3,
+        "low": False,
+    },
     "list_orders": {
         "data": [
             {
@@ -135,6 +224,35 @@ SAMPLES: Dict[str, Any] = {
         "refundable": True,
         "refund_request": None,
     },
+    "list_tickets": {
+        "untrusted_fields": ["subject"],
+        "data": [
+            {
+                "id": 200,
+                "status": "open",
+                "subject": "My download expired",
+                "created_at": "2026-11-01T10:00:00Z",
+                "last_message_at": "2026-11-01T10:05:00Z",
+            }
+        ],
+    },
+    "get_ticket": {
+        "untrusted_fields": ["subject", "messages[].body"],
+        "id": 200,
+        "status": "open",
+        "subject": "My download expired",
+        "created_at": "2026-11-01T10:00:00Z",
+        "buyer_tg_user_id": None,
+        "messages": [
+            {
+                "author": "buyer",
+                "author_tg_user_id": None,
+                "body": "Could you restore it?",
+                "created_at": "2026-11-01T10:05:00Z",
+            }
+        ],
+        "omitted_messages": 0,
+    },
     "list_payments": {
         "health": {
             "pending_fulfillment": 0,
@@ -169,20 +287,155 @@ SAMPLES: Dict[str, Any] = {
         "checkouts_paid": 3,
         "open_tickets": 0,
     },
+    "list_coupons": {"data": [COUPON], "next_cursor": None},
+    "create_category": answer(result=CATEGORY),
+    "update_category": answer(result=dict(CATEGORY, title="Handbooks")),
+    "move_category": answer(result={"id": 1, "from_index": 2, "to_index": 0}),
+    "delete_category": answer(
+        result={"deleted": True, "category_id": 1},
+        effect={"summary": "Delete the category Guides.", "details": {"category_id": 1}},
+    ),
+    "move_item": answer(result={"id": 10, "from_index": 3, "to_index": 0}),
+    "delete_item": answer(
+        result={"item_id": 10, "outcome": "archived", "bundle_ids": []},
+        effect={"summary": "Archive the item Guide.", "details": {"outcome": "archived", "carts": 0}},
+    ),
+    "create_coupon": answer(result=COUPON),
+    "update_coupon": answer(result=dict(COUPON, is_active=False)),
+    "stage_key_import": answer(
+        result={
+            "item_id": 10,
+            "staged_import": {
+                "id": "stage_abc123",
+                "expires_at": "2026-11-02T12:15:00Z",
+            },
+            "keys": 2,
+            "would_add": 2,
+            "duplicates": 0,
+            "too_long": 0,
+            "available_now": 5,
+            "available_after": 7,
+            "turns_on_key_delivery": False,
+            "members_only": False,
+            "comma_lines": 0,
+            "hidden": False,
+        }
+    ),
+    "commit_key_import": answer(
+        result={
+            "item_id": 10,
+            "added": 2,
+            "duplicates": 0,
+            "too_long": 0,
+            "available": 7,
+            "members_only": False,
+            "turned_on_key_delivery": False,
+        }
+    ),
+    "void_keys": answer(result={"item_id": 10, "voided": 5}),
+    "release_key_holds": answer(
+        result={"item_id": 10, "released": 2, "unheld": 7, "until": "2026-11-02T12:05:00Z"}
+    ),
+    "reply_ticket": answer(
+        result={"ticket_id": 200, "status": "answered", "delivered": True}
+    ),
+    "close_ticket": answer(
+        result={"ticket_id": 200, "status": "closed", "notified": True}
+    ),
+    "restore_downloads": answer(
+        result={
+            "order_id": 100,
+            "files": 2,
+            "downloads": 5,
+            "expires_at": "2026-11-09T12:00:00Z",
+            "gift_unredeemed": False,
+            "notified": True,
+        }
+    ),
+    "send_broadcast": answer(
+        "pending_approval",
+        approval={
+            "id": 12,
+            "status": "pending",
+            "expires_at": "2026-11-03T12:15:00Z",
+            "reasons": ["broadcast_requires_owner"],
+        },
+    ),
+    "cancel_broadcast": answer(result=dict(BROADCAST, status="cancelled")),
+    "add_variant": answer(result=VARIANT),
+    "update_variant": answer(result=dict(VARIANT, price_stars=250)),
+    "request_product_file": answer(result={"sent": True, "item_id": 10, "variant_id": None}),
+    "reprice_items": answer(
+        result={
+            "items": [
+                {
+                    "item_id": 10,
+                    "price_stars": 250,
+                    "version": "fedcba9876543210",
+                    "changed": True,
+                }
+            ]
+        }
+    ),
 }
+SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
+SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
+SAMPLES["create_bundle"] = answer(
+    result=dict(SAMPLES["get_item"], id=11, delivery="bundle", stock=None, status="hidden")
+)
+SAMPLES["update_bundle"] = answer(
+    result=dict(
+        SAMPLES["create_bundle"]["result"],
+        bundle={
+            "components": [{"id": 10, "title": "Guide", "own_price": 300, "problem": None}],
+            "ready": False,
+        },
+        warning="A bundle should contain at least two items.",
+    )
+)
 
-#: Request path (after the base URL) -> operation id, for routing mock requests.
+#: (method, request path after the base URL) -> operation id, for routing mock requests.
 ROUTES = {
-    "/store": "get_store",
-    "/attention": "needs_attention",
-    "/categories": "list_categories",
-    "/items": "list_items",
-    "/items/10": "get_item",
-    "/stock": "list_stock",
-    "/orders": "list_orders",
-    "/orders/100": "get_order",
-    "/payments": "list_payments",
-    "/reports/summary": "sales_summary",
+    ("GET", "/approvals/12"): "get_approval",
+    ("GET", "/store"): "get_store",
+    ("GET", "/attention"): "needs_attention",
+    ("GET", "/categories"): "list_categories",
+    ("GET", "/items"): "list_items",
+    ("GET", "/items/10"): "get_item",
+    ("GET", "/stock"): "list_stock",
+    ("GET", "/items/10/stock"): "get_item_stock",
+    ("GET", "/orders"): "list_orders",
+    ("GET", "/orders/100"): "get_order",
+    ("POST", "/orders/100/restore-downloads"): "restore_downloads",
+    ("GET", "/tickets"): "list_tickets",
+    ("GET", "/tickets/200"): "get_ticket",
+    ("POST", "/tickets/200/replies"): "reply_ticket",
+    ("POST", "/tickets/200/close"): "close_ticket",
+    ("GET", "/payments"): "list_payments",
+    ("GET", "/reports/summary"): "sales_summary",
+    ("POST", "/categories"): "create_category",
+    ("PATCH", "/categories/1"): "update_category",
+    ("POST", "/categories/1/move"): "move_category",
+    ("POST", "/categories/1/delete"): "delete_category",
+    ("GET", "/coupons"): "list_coupons",
+    ("POST", "/items"): "create_item",
+    ("PATCH", "/items/10"): "update_item",
+    ("POST", "/items/10/move"): "move_item",
+    ("POST", "/items/10/delete"): "delete_item",
+    ("POST", "/coupons"): "create_coupon",
+    ("PATCH", "/coupons/SPRING10"): "update_coupon",
+    ("POST", "/items/10/keys/stage"): "stage_key_import",
+    ("POST", "/items/10/keys/commit"): "commit_key_import",
+    ("POST", "/items/10/keys/void"): "void_keys",
+    ("POST", "/items/10/keys/release"): "release_key_holds",
+    ("POST", "/broadcasts"): "send_broadcast",
+    ("POST", "/broadcasts/30/cancel"): "cancel_broadcast",
+    ("POST", "/bundles"): "create_bundle",
+    ("PATCH", "/bundles/11"): "update_bundle",
+    ("POST", "/items/10/variants"): "add_variant",
+    ("PATCH", "/variants/20"): "update_variant",
+    ("POST", "/items/10/file-request"): "request_product_file",
+    ("POST", "/reprice"): "reprice_items",
 }
 
 PREFIX = "/api/merchant/v1"
@@ -192,7 +445,7 @@ def route(request: httpx.Request) -> httpx.Response:
     """A handler answering every operation with its sample payload."""
     path = request.url.path
     assert path.startswith(PREFIX + "/"), path
-    op = ROUTES.get(path[len(PREFIX):])
+    op = ROUTES.get((request.method, path[len(PREFIX):]))
     if op is None:
         return httpx.Response(404, json={"error": "not_found"})
     return httpx.Response(200, json=SAMPLES[op])

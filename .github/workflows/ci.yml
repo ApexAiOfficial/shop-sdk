@@ -31,3 +31,5 @@ jobs:
           pip install -e ".[dev]"
       - name: Test
         run: pytest -q
+      - name: Type check (package, examples, README write examples)
+        run: mypy

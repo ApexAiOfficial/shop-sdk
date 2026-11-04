@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-11-04
 
 Review moderation, custom-order questions and rejections, membership plans and
 product version labels. Requires a store on API revision 2026-11-05; reviews

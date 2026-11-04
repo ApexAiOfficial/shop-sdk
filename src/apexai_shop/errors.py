@@ -6,8 +6,9 @@ HTTP status, the stable error code from the response body (for example
 and the request id when the server sent one. Errors never contain the token.
 
 Refused writes add a few classes keyed on their stable codes:
-:class:`ConflictError` (409, with :class:`ChangedError` and
-:class:`ConfirmationInvalidError`), :class:`StoreSuspendedError` (423),
+:class:`ConflictError` (409, with :class:`ChangedError`,
+:class:`ConfirmationInvalidError`, :class:`WrongStateError` and
+:class:`NotPublishableError`), :class:`StoreSuspendedError` (423),
 :class:`DailyCapError` (429 ``daily_cap``), :class:`ApprovalRequiredError` and
 :class:`WritesDisabledError` (403).
 
@@ -35,6 +36,8 @@ __all__ = [
     "NotFoundError",
     "BadRequestError",
     "ConflictError",
+    "WrongStateError",
+    "NotPublishableError",
     "ConfirmKeyDeliveryError",
     "ChangedError",
     "ConfirmationInvalidError",
@@ -149,7 +152,12 @@ class WritesDisabledError(PermissionDeniedError):
 
 
 class NotFoundError(ShopError):
-    """404: no such item or order."""
+    """404: no such item or order.
+
+    ``membership_plans.get`` raises it for an unknown plan id after reading the
+    plan list, so there is no 404: ``status`` is ``None`` and ``code`` is
+    ``not_found``. Tell a missing object apart by ``code``, not ``status``.
+    """
 
 
 class BadRequestError(ShopError):
@@ -184,7 +192,8 @@ class ConflictError(ShopError):
     holds the object as it is now, so you can show it and try again. Other
     409 codes (``idempotency_in_progress`` once the client's retries are
     spent, and codes newer than this client) raise this class too, with
-    ``current`` set to ``None``.
+    ``current`` set to ``None`` unless the API sent it. ``current_status`` is
+    the status of a custom order a ``wrong_state`` refusal names, or ``None``.
     """
 
     def __init__(
@@ -194,9 +203,30 @@ class ConflictError(ShopError):
         message: str,
         request_id: Optional[str] = None,
         current: Optional[Dict[str, Any]] = None,
+        current_status: Optional[str] = None,
     ) -> None:
         self.current = current
+        self.current_status = current_status
         super().__init__(status, code, message, request_id)
+
+
+class WrongStateError(ConflictError):
+    """409 ``wrong_state``: the object is not in a state this change applies to.
+
+    Nothing was changed. A review that is still a draft or was replaced by the
+    buyer's newer review, or a custom order that already moved on (its status
+    is in ``current_status``), answers this. ``current`` holds the object's
+    state when the API sends it. Read the object again before deciding.
+    """
+
+
+class NotPublishableError(ConflictError):
+    """409 ``not_publishable``: the review was withdrawn and can never be published.
+
+    Its order was refunded or is no longer paid, or its buyer asked the store to
+    forget them. Nothing was changed; the message never names the order or the
+    buyer.
+    """
 
 
 class ChangedError(ConflictError):

@@ -12,6 +12,8 @@ import pytest
 from apexai_shop import AsyncShop, Shop
 
 BASE_URL = "https://your-store.example/api/merchant/v1/"
+#: The contract revision the bundled copies carry.
+API_REVISION = "2026-11-05"
 TOKEN = "shp_test_SECRET_token_value_123"
 CONTRACT_PATH = Path(__file__).resolve().parent.parent / "contract" / "merchant-api-v1.json"
 
@@ -88,6 +90,59 @@ APPROVAL = {
 }
 
 
+REVIEW = {
+    "review_id": 300,
+    "item_id": 10,
+    "item_title": "Guide",
+    "rating": 4,
+    "title": "Useful",
+    "body": "Clear and short.",
+    "content_state": "submitted",
+    "visibility_state": "public",
+    "governance_state": "eligible",
+    "is_current": True,
+    "counted": False,
+    "publishable": True,
+    "has_response": False,
+    "submitted_at": "2026-11-03T10:00:00Z",
+    "published_at": None,
+}
+
+REVIEW_STATE = {
+    "review_id": 300,
+    "item_id": 10,
+    "content_state": "published",
+    "visibility_state": "public",
+    "counted": True,
+    "aggregate": {"average": 4.5, "count": 2},
+}
+
+CUSTOM_ORDER = {
+    "request_id": 400,
+    "status": "PENDING",
+    "title": "A logo",
+    "budget_range": "500-800 Stars",
+    "deadline_text": "next week",
+    "created_at": "2026-11-03T09:00:00Z",
+    "updated_at": "2026-11-03T09:30:00Z",
+    "quote": None,
+    "actions": ["clarify", "reject"],
+}
+
+MEMBERSHIP_PLAN = {
+    "plan_id": 5,
+    "title": "Club",
+    "description": "Members-only guides.",
+    "category_id": 1,
+    "category_title": "Guides",
+    "price_stars": 250,
+    "active": True,
+    "live_members": 12,
+    "members_only_items": 3,
+    "updated_at": "2026-11-02T08:00:00Z",
+}
+
+
 def answer(status: str = "done", **fields: Any) -> Dict[str, Any]:
     """A write's envelope: ``done`` unless ``status`` says otherwise, every field present."""
     body: Dict[str, Any] = {
@@ -117,7 +172,7 @@ def preview(confirmation_id: str = "conf_abc123", summary: str = "Delete the cat
 SAMPLES: Dict[str, Any] = {
     "get_approval": APPROVAL,
     "get_store": {
-        "api_version": "1", "api_revision": "2026-11-04",
+        "api_version": "1", "api_revision": API_REVISION,
         "store": {"name": "Demo Store", "tier": "business", "currency": "XTR"},
         "token": {
             "id": 7,
@@ -164,6 +219,7 @@ SAMPLES: Dict[str, Any] = {
         "members_only": False,
         "publish_blocker": None,
         "version": "v1",
+        "version_label": "2.1",
     },
     "list_stock": {
         "data": [
@@ -378,6 +434,64 @@ SAMPLES: Dict[str, Any] = {
         }
     ),
 }
+SAMPLES.update(
+    {
+        "list_reviews": {
+            "untrusted_fields": ["data[].title", "data[].body"],
+            "data": [REVIEW],
+            "next_cursor": None,
+        },
+        "get_review": dict(
+            REVIEW,
+            untrusted_fields=["title", "body"],
+            response={
+                "body": "Thank you!",
+                "created_at": "2026-11-03T11:00:00Z",
+                "updated_at": "2026-11-03T11:00:00Z",
+            },
+            history=[
+                {
+                    "action": "submitted",
+                    "actor_type": "buyer",
+                    "at": "2026-11-03T10:00:00Z",
+                    "reason_code": None,
+                }
+            ],
+            aggregate={"average": 5.0, "count": 1},
+            has_response=True,
+        ),
+        "publish_review": answer(result=REVIEW_STATE),
+        "withhold_review": answer(
+            result=dict(REVIEW_STATE, content_state="removed", counted=False)
+        ),
+        "respond_review": answer(result={"review_id": 300, "created": True, "characters": 10}),
+        "list_custom_orders": {
+            "untrusted_fields": ["data[].title", "data[].budget_range", "data[].deadline_text"],
+            "data": [CUSTOM_ORDER],
+            "next_cursor": None,
+        },
+        "get_custom_order": dict(
+            CUSTOM_ORDER,
+            untrusted_fields=["title", "description", "notes", "clarification_response"],
+            description="A square logo for my shop.",
+            notes=None,
+            clarification_message=None,
+            clarification_response=None,
+            rejection_reason=None,
+            notice={"status": None, "attempts": 0},
+        ),
+        "clarify_custom_order": answer(
+            result={"request_id": 400, "status": "CLARIFICATION_REQUESTED", "notified": True}
+        ),
+        "reject_custom_order": answer(
+            result={"request_id": 400, "status": "REJECTED", "notified": False}
+        ),
+        "list_membership_plans": {"untrusted_fields": [], "data": [MEMBERSHIP_PLAN]},
+        "set_membership_price": answer(result=dict(MEMBERSHIP_PLAN, price_stars=300)),
+        "set_membership_active": answer(result=dict(MEMBERSHIP_PLAN, active=False)),
+        "set_version_label": answer(result={"item_id": 10, "version_label": "2.2"}),
+    }
+)
 SAMPLES["create_item"] = answer(result=dict(SAMPLES["get_item"], status="hidden"))
 SAMPLES["update_item"] = answer(result=dict(SAMPLES["get_item"], price_stars=250))
 SAMPLES["create_bundle"] = answer(
@@ -436,6 +550,19 @@ ROUTES = {
     ("PATCH", "/variants/20"): "update_variant",
     ("POST", "/items/10/file-request"): "request_product_file",
     ("POST", "/reprice"): "reprice_items",
+    ("GET", "/reviews"): "list_reviews",
+    ("GET", "/reviews/300"): "get_review",
+    ("POST", "/reviews/300/publish"): "publish_review",
+    ("POST", "/reviews/300/withhold"): "withhold_review",
+    ("POST", "/reviews/300/response"): "respond_review",
+    ("GET", "/custom-orders"): "list_custom_orders",
+    ("GET", "/custom-orders/400"): "get_custom_order",
+    ("POST", "/custom-orders/400/clarify"): "clarify_custom_order",
+    ("POST", "/custom-orders/400/reject"): "reject_custom_order",
+    ("GET", "/membership-plans"): "list_membership_plans",
+    ("POST", "/membership-plans/5/price"): "set_membership_price",
+    ("POST", "/membership-plans/5/active"): "set_membership_active",
+    ("POST", "/items/10/version-label"): "set_version_label",
 }
 
 PREFIX = "/api/merchant/v1"

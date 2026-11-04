@@ -25,14 +25,16 @@ from .errors import (
     ConflictError,
     DailyCapError,
     NotFoundError,
+    NotPublishableError,
     PermissionDeniedError,
     RateLimitError,
     ServerError,
     ShopError,
     StoreSuspendedError,
     WritesDisabledError,
+    WrongStateError,
 )
-from .models import ConfirmationInfo, WriteAnswer
+from .models import ConfirmationInfo, MembershipPlanList, MembershipPlanRow, WriteAnswer
 from .results import Completed, Confirm, ConfirmationRequired, PendingApproval, WriteResult
 
 ENV_BASE_URL = "SHOP_API_URL"
@@ -166,6 +168,14 @@ def build_request(
 def confirmable(operation_id: str) -> bool:
     """Whether the operation takes a ``confirmation`` (a two-step write)."""
     return "confirmation" in OPERATIONS[operation_id].body
+
+
+def find_plan(plans: MembershipPlanList, plan_id: int) -> MembershipPlanRow:
+    """The plan with ``plan_id`` in ``plans``, or :class:`NotFoundError` (the API has no single-plan read)."""
+    for plan in plans.data:
+        if plan.plan_id == plan_id:
+            return plan
+    raise NotFoundError(None, "not_found", f"No membership plan has id {plan_id}.")
 
 
 def idempotency_key(key: Optional[str] = None) -> str:
@@ -318,6 +328,13 @@ LOST_ANSWER_NOTE = (
 )
 
 
+#: 409 codes with their own :class:`ConflictError` subclass (beyond ``changed`` and friends).
+_CONFLICT_CLASSES: Dict[str, Type[ConflictError]] = {
+    "wrong_state": WrongStateError,
+    "not_publishable": NotPublishableError,
+}
+
+
 def error_from_response(
     response: httpx.Response,
     bind_preview: Optional[Callable[[Dict[str, Any]], Optional[ConfirmationRequired[Any]]]] = None,
@@ -385,8 +402,15 @@ def error_from_response(
             )
             return ConfirmKeyDeliveryError(status, code, message, request_id)
         current = body.get("current")
-        return ConflictError(
-            status, code, message, request_id, current=current if isinstance(current, dict) else None
+        current_status = body.get("current_status")
+        conflict_class = _CONFLICT_CLASSES.get(code, ConflictError)
+        return conflict_class(
+            status,
+            code,
+            message,
+            request_id,
+            current=current if isinstance(current, dict) else None,
+            current_status=current_status if isinstance(current_status, str) else None,
         )
     if status == 423:
         return StoreSuspendedError(status, code, message, request_id)

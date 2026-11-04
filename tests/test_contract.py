@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from apexai_shop import models
 from apexai_shop._core import IDEMPOTENCY_HEADER, IDEMPOTENCY_KEY_PATTERN, confirmable
 from apexai_shop._operations import OPERATIONS
-from conftest import SAMPLES
+from conftest import API_REVISION, SAMPLES
 
 #: Error bodies become exceptions, not models.
 ERROR_SCHEMAS = {"Error", "InvalidRequest", "WriteError"}
@@ -64,7 +64,7 @@ def test_operation_table_matches_contract_paths(contract):
     in_contract = {(method, path) for method, path, _ in _operations(contract)}
     in_table = {(op.method, op.path) for op in OPERATIONS.values()}
     assert in_table == in_contract
-    assert len(OPERATIONS) == len(in_contract) == 40
+    assert len(OPERATIONS) == len(in_contract) == 53
 
 
 def test_operation_ids_match(contract):
@@ -241,10 +241,20 @@ def test_test_samples_cover_every_operation_and_validate(contract):
         model.model_validate(SAMPLES[op["operationId"]])
 
 
+def _write_answer_names(contract):
+    """The answer schema of every write, from its 200 response."""
+    return {
+        _ref_name(op["responses"]["200"]["content"]["application/json"]["schema"])
+        for method, _, op in _operations(contract)
+        if method != "GET"
+    }
+
+
 def test_write_answer_subclasses_only_type_the_result(contract):
     """Each operation's answer is the WriteAnswer envelope with a typed ``result``."""
     base = contract["components"]["schemas"]["WriteAnswer"]
-    for name in (
+    names = _write_answer_names(contract)
+    assert names >= {
         "CategoryAnswer",
         "CategoryMoveAnswer",
         "CategoryDeleteAnswer",
@@ -260,8 +270,216 @@ def test_write_answer_subclasses_only_type_the_result(contract):
         "FileRequestAnswer",
         "RepriceAnswer",
         "VariantAnswer",
-    ):
+        "ReviewStateAnswer",
+        "ReviewResponseAnswer",
+        "CustomOrderAnswer",
+        "MembershipPlanAnswer",
+        "VersionLabelAnswer",
+    }
+    for name in names:
         schema = contract["components"]["schemas"][name]
-        assert set(schema["properties"]) == set(base["properties"])
-        assert schema["required"] == base["required"]
-        assert issubclass(getattr(models, name), models.WriteAnswer)
+        assert set(schema["properties"]) == set(base["properties"]), name
+        assert schema["required"] == base["required"], name
+        model = getattr(models, name)
+        assert issubclass(model, models.WriteAnswer), name
+        result_schema = _ref_name(schema["properties"]["result"])
+        result_hint = typing.get_type_hints(model)["result"]
+        assert getattr(models, result_schema) in typing.get_args(result_hint), name
+
+
+def test_confirmable_writes_are_exactly_the_two_step_ones_by_name(contract):
+    """Pins which writes preview first, so a contract change cannot move one silently."""
+    assert {operation_id for operation_id in OPERATIONS if confirmable(operation_id)} == {
+        "delete_category",
+        "delete_item",
+        "reprice_items",
+        "update_coupon",
+        "void_keys",
+        "release_key_holds",
+        "withhold_review",
+        "clarify_custom_order",
+        "reject_custom_order",
+        "set_membership_price",
+        "set_membership_active",
+    }
+
+
+def test_approval_only_writes_have_a_pending_202(contract):
+    """Writes that can wait for the owner but never preview: a 202 that is only pending_approval."""
+    approval_only = set()
+    for method, _, op in _operations(contract):
+        description = op["responses"].get("202", {}).get("description", "")
+        if "pending_approval" in description and "confirmation_required" not in description:
+            approval_only.add(op["operationId"])
+    assert {"publish_review", "respond_review"} <= approval_only
+    for operation_id in approval_only:
+        assert not confirmable(operation_id), operation_id
+
+
+def test_a44_reads_take_their_documented_filters(contract):
+    assert OPERATIONS["list_reviews"].query == ("status", "item_id", "rating", "limit", "cursor")
+    assert OPERATIONS["list_custom_orders"].query == ("status", "limit", "cursor")
+    assert OPERATIONS["list_membership_plans"].query == ()
+    statuses = {
+        p["name"]: p["schema"]
+        for p in contract["paths"]["/reviews"]["get"]["parameters"]
+        if p["in"] == "query"
+    }
+    assert statuses["status"]["enum"] == ["queue", "public", "hidden", "removed", "all"]
+    assert statuses["status"]["default"] == "queue"
+
+
+def test_webhook_contract_has_the_same_revision_as_the_samples(contract):
+    import json
+    from conftest import CONTRACT_PATH
+
+    webhooks = json.loads(
+        (CONTRACT_PATH.parent / "merchant-webhooks-v1.json").read_text(encoding="utf-8")
+    )
+    assert webhooks["x-api-revision"] == SAMPLES["get_store"]["api_revision"] == API_REVISION
+
+
+def test_item_version_label_is_optional_and_nullable(contract):
+    for name in ("ItemDetail", "Bundle"):
+        schema = contract["components"]["schemas"][name]
+        assert "version_label" in schema["properties"]
+        assert "version_label" not in schema.get("required", [])
+        assert not models.ItemDetail.model_fields["version_label"].is_required()
+
+
+# --- scopes: the docstrings must name what the contracts require ------------
+
+#: The operations added in API revision 2026-11-05 (A4.4): each SDK method that
+#: reaches one must say which scopes it needs.
+A44_OPERATIONS = {
+    "list_reviews",
+    "get_review",
+    "publish_review",
+    "withhold_review",
+    "respond_review",
+    "list_custom_orders",
+    "get_custom_order",
+    "clarify_custom_order",
+    "reject_custom_order",
+    "list_membership_plans",
+    "set_membership_price",
+    "set_membership_active",
+    "set_version_label",
+}
+_SCOPE = re.compile(r"``([a-z_]+:(?:read|write))``")
+_NEEDS = re.compile(r"Needs\s+(.*?)(?:\.\s|\.$|;)", re.S)
+_CLIENT_SOURCES = ("client.py", "async_client.py")
+
+
+def _mcp_contract():
+    import json
+    from conftest import CONTRACT_PATH
+
+    return json.loads(
+        (CONTRACT_PATH.parent / "merchant-mcp-v1.json").read_text(encoding="utf-8")
+    )
+
+
+def _required_scopes(contract, mcp):
+    """Operation id -> the scopes a token needs, from the two contracts.
+
+    The MCP contract maps each tool (named like the operation) to its main
+    scope; an operation that also needs ``pricing:write`` says so in its API
+    description ("Needs pricing:write ...").
+    """
+    required = {}
+    for _, _, op in _operations(contract):
+        operation_id = op["operationId"]
+        scope = mcp["scopes"][operation_id]
+        needs = {scope} if scope else set()
+        if re.search(r"\bNeeds pricing:write\b", op.get("description", "")):
+            needs.add("pricing:write")
+        required[operation_id] = needs
+    return required
+
+
+def _operation_ids(node):
+    import ast
+
+    return {
+        c.value
+        for c in ast.walk(node)
+        if isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value in OPERATIONS
+    }
+
+
+def _documented_methods():
+    """(source, class, method, operation ids reached, scopes its docstring names or None).
+
+    A method reaches the operations it names and those of the methods of its
+    own class it calls (``reviews.queue`` pages through ``iter``,
+    ``membership_plans.get`` reads ``list``).
+    """
+    import ast
+    from pathlib import Path
+
+    import apexai_shop
+
+    package = Path(apexai_shop.__file__).resolve().parent
+    for source in _CLIENT_SOURCES:
+        tree = ast.parse((package / source).read_text(encoding="utf-8"))
+        for cls in (n for n in tree.body if isinstance(n, ast.ClassDef)):
+            methods = {
+                n.name: n
+                for n in cls.body
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            }
+            for name, method in methods.items():
+                if name.startswith("_"):
+                    continue
+                operation_ids = _operation_ids(method)
+                for call in ast.walk(method):
+                    if (
+                        isinstance(call, ast.Call)
+                        and isinstance(call.func, ast.Attribute)
+                        and isinstance(call.func.value, ast.Name)
+                        and call.func.value.id == "self"
+                        and call.func.attr in methods
+                    ):
+                        operation_ids |= _operation_ids(methods[call.func.attr])
+                if not operation_ids:
+                    continue
+                needs = _NEEDS.search(ast.get_docstring(method) or "")
+                scopes = set(_SCOPE.findall(needs.group(1))) if needs else None
+                yield source, cls.name, name, operation_ids, scopes
+
+
+def test_mcp_contract_scopes_every_operation(contract):
+    mcp = _mcp_contract()
+    assert mcp["api_revision"] == API_REVISION
+    assert set(mcp["scopes"]) == {tool["name"] for tool in mcp["tools"]} == set(OPERATIONS)
+    required = _required_scopes(contract, mcp)
+    # The scopes the A4.4 design settled, as the contracts state them.
+    assert required["list_reviews"] == required["get_review"] == {"reviews:read"}
+    assert required["respond_review"] == {"reviews:write"}
+    assert required["list_custom_orders"] == {"custom_orders:read"}
+    assert required["reject_custom_order"] == {"custom_orders:write"}
+    assert required["list_membership_plans"] == {"catalog:read"}
+    assert required["set_membership_active"] == required["set_version_label"] == {"catalog:write"}
+    assert required["set_membership_price"] == {"catalog:write", "pricing:write"}
+
+
+def test_docstring_scopes_match_the_contracts(contract):
+    required = _required_scopes(contract, _mcp_contract())
+    checked = set()
+    for source, cls, name, operation_ids, scopes in _documented_methods():
+        if scopes is None:
+            continue
+        expected = set().union(*(required[o] for o in operation_ids))
+        assert scopes == expected, (source, cls, name, sorted(operation_ids))
+        checked.add((source, frozenset(operation_ids)))
+    assert checked  # the docstring pattern still finds something
+
+
+def test_every_a44_method_names_its_scopes():
+    seen = {source: set() for source in _CLIENT_SOURCES}
+    for source, cls, name, operation_ids, scopes in _documented_methods():
+        if operation_ids & A44_OPERATIONS:
+            assert scopes, f"{source} {cls}.{name} does not say which scopes it needs"
+            seen[source] |= operation_ids & A44_OPERATIONS
+    assert seen == {source: A44_OPERATIONS for source in _CLIENT_SOURCES}

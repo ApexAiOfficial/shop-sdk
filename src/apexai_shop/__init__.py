@@ -30,12 +30,14 @@ from .errors import (
     ConnectionError,
     DailyCapError,
     NotFoundError,
+    NotPublishableError,
     PermissionDeniedError,
     RateLimitError,
     ServerError,
     ShopError,
     StoreSuspendedError,
     WritesDisabledError,
+    WrongStateError,
 )
 
 __all__ = [
@@ -59,6 +61,8 @@ __all__ = [
     "BadRequestError",
     "ConflictError",
     "ChangedError",
+    "WrongStateError",
+    "NotPublishableError",
     "ConfirmKeyDeliveryError",
     "ConfirmationInvalidError",
     "StoreSuspendedError",

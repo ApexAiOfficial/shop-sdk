@@ -40,7 +40,7 @@ export SHOP_API_TOKEN="<the token the bot showed you>"
 ## Install
 
 ```sh
-pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.2.0"
+pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.4.0"
 ```
 
 ## Quickstart

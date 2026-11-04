@@ -14,7 +14,7 @@ accounting exports, catalog tools or an AI agent that helps run the shop.
 - Safe writes: an idempotency key per change, previews you confirm, typed results.
 - Only two dependencies: `httpx` and `pydantic`. Python 3.10+.
 
-The merchant API is part of the **Business plan**. Reading needs a token with
+The merchant API is part of the **Business plan** and of every **free-beta** store. Reading needs a token with
 read scopes; changing the store needs a write scope such as `catalog:write`
 (see [Changing the store](#changing-the-store)).
 

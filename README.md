@@ -18,6 +18,10 @@ The merchant API is part of the **Business plan**. Reading needs a token with
 read scopes; changing the store needs a write scope such as `catalog:write`
 (see [Changing the store](#changing-the-store)).
 
+**Availability (2026-11-04):** no ApexAi-operated store serves the merchant API yet. A store needs Shop Bot
+0.8.0 or later (not yet released) with the merchant API switched on. Until then, this SDK has nothing to
+connect to.
+
 ## Get a token
 
 1. Open a **private chat** with your store's bot (as the store owner).
@@ -36,7 +40,7 @@ export SHOP_API_TOKEN="<the token the bot showed you>"
 ## Install
 
 ```sh
-pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.1.0"
+pip install "git+https://github.com/ApexAiOfficial/shop-sdk@v0.2.0"
 ```
 
 ## Quickstart
@@ -185,15 +189,22 @@ shows them. A call without the scope it needs raises `PermissionDeniedError`
 | `custom_orders:read` | Custom-order requests and their details (`custom_orders.list`, `iter`, `get`) |
 | `custom_orders:write` | Ask a custom order's buyer a question or reject the request; both message the buyer (`custom_orders.clarify`, `reject`). A text with a link or contact details needs the owner's approval |
 
-The bot offers presets when a token is created: **read-only** (`catalog:read`,
-`inventory:read`, `orders:read`, `reports:read`, `coupons:read`, `reviews:read`,
-`custom_orders:read`) and presets that add write scopes; `/apitoken` in the private
-chat lists them. A token minted before the store took changes through the API has no
-write scope: mint a new one for a job that changes the store. A token is never
-widened after it is minted, so one made before the review and custom-order scopes
-existed lacks them: mint a new one for a job that reads or moderates reviews or
-answers custom orders. Membership plans and version labels need only catalog
-scopes, so older tokens with those scopes can use them.
+The bot offers four presets when a token is created, plus a custom set of scopes chosen one by one:
+- **Read-only:** `catalog:read`, `inventory:read`, `orders:read`, `reports:read`, `coupons:read`,
+  `reviews:read`, `custom_orders:read`.
+- **Support:** `catalog:read`, `orders:read`, plus the support and delivery scopes. It has no
+  `customers:read`, coupon, catalog, review or custom-order writes, so a ticket's text cannot steer
+  it into granting a discount or messaging other buyers.
+- **Catalog and stock:** Read-only plus the catalog, price and stock write scopes.
+- **Full:** every scope, including `customers:read`, coupon writes, broadcasts, review moderation
+  and custom-order replies.
+
+A token minted before the store took changes through the API has no write scope: mint a new one for a
+job that changes the store. A token is never widened after it is minted, so one made before the review
+and custom-order scopes existed lacks them: mint a new one for a job that reads or moderates reviews or
+answers custom orders. Membership plans and version labels need only catalog scopes, so older tokens
+with those scopes can use them. Refunds are never available through the API, whatever the token; they
+stay in the store's chat and admin app.
 
 Further scopes arrive with the operations that need them. Give each token only
 the scopes the job needs.

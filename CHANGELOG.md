@@ -64,11 +64,15 @@ and custom orders need a token minted with their new scopes.
   request for an unknown plan id: `status` is `None` and `code` is
   `not_found`.
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-11-04
 
 Completes the merchant API write surface: catalog, prices, coupons, licence
 keys, support, fulfilment, broadcasts and product delivery. Requires a store
 whose merchant API takes changes.
+
+### Security
+
+- A plain `http://` base URL is refused unless it points at this machine (`localhost`, `127.0.0.1`, `::1`, `*.localhost`), so a token never crosses the network in clear text.
 
 ### Added
 

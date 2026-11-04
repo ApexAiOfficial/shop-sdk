@@ -8,7 +8,7 @@ import secrets
 from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, TypeVar, Union
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -79,9 +79,22 @@ def resolve_config(base_url: Optional[str], token: Optional[str]) -> Tuple[str, 
     if not token or not token.strip():
         raise ValueError(f"No API token: pass token= or set {ENV_TOKEN}.")
     base_url = base_url.strip()
-    if not base_url.lower().startswith(("https://", "http://")):
-        raise ValueError("The API base URL must start with https:// or http://.")
+    lowered = base_url.lower()
+    if lowered.startswith("http://"):
+        # The token would cross the network in clear text: plain http is only for a store on this
+        # machine (a local development store).
+        host = (urlsplit(base_url).hostname or "").lower()
+        if host not in _LOOPBACK_HOSTS and not host.endswith(".localhost"):
+            raise ValueError(
+                "The API base URL must use https://; plain http:// is allowed only for a store on this machine "
+                "(localhost, 127.0.0.1 or ::1)."
+            )
+    elif not lowered.startswith("https://"):
+        raise ValueError("The API base URL must start with https://.")
     return base_url.rstrip("/"), token.strip()
+
+
+_LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 def default_headers(token: str) -> Dict[str, str]:

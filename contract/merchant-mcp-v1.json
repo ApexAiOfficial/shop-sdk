@@ -97,7 +97,8 @@
                 "enum": [
                   "starter",
                   "growth",
-                  "business"
+                  "business",
+                  "beta"
                 ],
                 "title": "Tier",
                 "type": "string"
@@ -7899,7 +7900,7 @@
         "readOnlyHint": false,
         "title": "Edit bundle items"
       },
-      "description": "Add one item to a bundle or take one out (set exactly one of add_item_id and remove_item_id); orders already placed keep the items they had.",
+      "description": "Add one item to a bundle or take one out (set exactly one of add_item_id and remove_item_id); orders already placed keep the items they had. Adding needs pricing:write too, and leaving the bundle priced under half of what its items sell for apart needs the owner's approval.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {

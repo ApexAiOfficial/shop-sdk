@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Documentation
+
+- README: ApexAi-operated stores serve the merchant API now (each at
+  `https://<store id>.apexaistores.app/api/merchant/v1/`), and the beta is the
+  public beta, not a free one.
+
 ## [0.4.0] - 2026-11-04
 
 Review moderation, custom-order questions and rejections, membership plans and

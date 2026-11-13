@@ -14,20 +14,21 @@ accounting exports, catalog tools or an AI agent that helps run the shop.
 - Safe writes: an idempotency key per change, previews you confirm, typed results.
 - Only two dependencies: `httpx` and `pydantic`. Python 3.10+.
 
-The merchant API is part of the **Business plan** and of every **free-beta** store. Reading needs a token with
+The merchant API is part of every **public beta** store and of the **Business plan**. Reading needs a token with
 read scopes; changing the store needs a write scope such as `catalog:write`
 (see [Changing the store](#changing-the-store)).
 
-**Availability (2026-11-04):** no ApexAi-operated store serves the merchant API yet. A store needs Shop Bot
-0.8.0 or later (not yet released) with the merchant API switched on. Until then, this SDK has nothing to
-connect to.
+**Availability (2026-11-13):** ApexAi-operated stores serve the merchant API now, each at its own address
+(`https://<store id>.apexaistores.app/api/merchant/v1/`). The public beta is open: create a store in
+[@ApexAiStores_bot](https://t.me/ApexAiStores_bot), and see [apexaiofficial.com/shop](https://apexaiofficial.com/shop)
+for the current price and places.
 
 ## Get a token
 
 1. Open a **private chat** with your store's bot (as the store owner).
 2. Send `/apitoken new <name>`, for example `/apitoken new reports`.
 3. The bot shows the token **once**, together with your store's API address
-   (something like `https://your-store.example/api/merchant/v1/`).
+   (`https://<store id>.apexaistores.app/api/merchant/v1/`).
    Copy both somewhere safe; the token cannot be shown again.
 
 Put them in the environment, where the client looks by default:

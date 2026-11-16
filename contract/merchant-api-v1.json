@@ -1361,6 +1361,12 @@
       "CreateCategory": {
         "additionalProperties": false,
         "properties": {
+          "active": {
+            "default": true,
+            "description": "false creates it hidden from buyers until it is shown.",
+            "title": "Active",
+            "type": "boolean"
+          },
           "title": {
             "maxLength": 200,
             "minLength": 1,
@@ -1377,6 +1383,12 @@
       "CreateCoupon": {
         "additionalProperties": false,
         "properties": {
+          "active": {
+            "default": true,
+            "description": "false creates it switched off: no buyer can use it until it is switched on.",
+            "title": "Active",
+            "type": "boolean"
+          },
           "code": {
             "description": "Letters, digits, - and _; stored upper-cased.",
             "maxLength": 32,
@@ -7906,7 +7918,7 @@
         "summary": "List Categories"
       },
       "post": {
-        "description": "Create a category, shown in the store, at the end of the category list.",
+        "description": "Create a category at the end of the category list, shown in the store unless active is false (then hidden from buyers until it is shown).",
         "operationId": "create_category",
         "parameters": [
           {
@@ -8677,7 +8689,7 @@
         "summary": "List Coupons"
       },
       "post": {
-        "description": "Create an active coupon. 50% off or more, or more than 1,000 or unlimited uses, needs the owner's approval. The same coupon again answers noop; another coupon with the code is 409 already_exists.",
+        "description": "Create a coupon, switched on unless active is false (then no buyer can use it until it is switched on). 50% off or more, or more than 1,000 or unlimited uses, needs the owner's approval. The same coupon again (active included) answers noop; another coupon with the code is 409 already_exists.",
         "operationId": "create_coupon",
         "parameters": [
           {

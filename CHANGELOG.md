@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- `categories.create(..., active=False)` creates a category hidden from buyers, and
+  `coupons.create(..., active=False)` a coupon switched off, in one call, so a draft is never
+  visible (shop-bot issue 297). The default (`True`) sends nothing new, so it works against a store
+  on an older API revision; `active=False` needs a store on API revision 2026-11-16 (Shop Bot 0.11.20).
+
 ### Documentation
 
 - README: ApexAi-operated stores serve the merchant API now (each at

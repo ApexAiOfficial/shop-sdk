@@ -375,6 +375,16 @@ there is no Retry-After, back off 0.5 s, 1 s, 2 s. They are never retried on
 429 `daily_cap`: a token has a rolling 24-hour allowance of changes, and
 `DailyCapError.retry_after` says when it has room again.
 
+### Product files
+
+The API never carries a file. `shop.items.request_file(item_id)` (with
+`variant_id=` for a variant) has the store bot ask the owner, in their private
+chat with it, for the file; the file the owner sends in reply is attached.
+Every call sends the owner a new prompt, so the client never retries it on its
+own: call it once, when the user asks. Until the file arrives, a file item is
+unfinished and cannot go into a bundle (`update_bundle` answers
+`invalid_request`).
+
 ## Pagination
 
 List endpoints return a page with `data` and `next_cursor`. `iter()` follows

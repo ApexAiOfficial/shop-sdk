@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The project follows
 - README: ApexAi-operated stores serve the merchant API now (each at
   `https://<store id>.apexaistores.app/api/merchant/v1/`), and the beta is the
   public beta, not a free one.
+- README: product files never travel through the API; `items.request_file` has the
+  store bot ask the owner for the file in Telegram.
 
 ## [0.4.0] - 2026-11-04
 

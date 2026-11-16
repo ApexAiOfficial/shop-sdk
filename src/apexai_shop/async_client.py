@@ -422,13 +422,17 @@ class AsyncCategories(_AsyncResource):
         return self._shop._paginate("list_categories", CategoryPage, {"limit": limit})
 
     async def create(
-        self, title: str, *, idempotency_key: Optional[str] = None
+        self, title: str, *, active: bool = True, idempotency_key: Optional[str] = None
     ) -> WriteResult[Category]:
-        """Create a category, shown in the store, at the end of the category list."""
+        """Create a category at the end of the category list, shown in the store.
+
+        ``active=False`` creates it hidden from buyers until it is shown
+        (``update(category_id, active=True)``).
+        """
         return await self._shop._write(
             "create_category",
             CategoryAnswer,
-            body={"title": title},
+            body={"title": title, **({} if active else {"active": False})},  # only when false: older stores refuse it
             idempotency_key=idempotency_key,
         )
 
@@ -752,11 +756,14 @@ class AsyncCoupons(_AsyncResource):
         max_uses: Optional[int] = None,
         per_user_max_uses: Optional[int] = None,
         expires_at: Optional[datetime] = None,
+        active: bool = True,
         idempotency_key: Optional[str] = None,
     ) -> WriteResult[Coupon]:
         """Create a coupon (the code is stored upper-cased).
 
-        ``max_uses=None`` means no limit and ``expires_at=None`` never. A
+        ``active=False`` creates it switched off: no buyer can use it until
+        ``update(code, active=True)``. ``max_uses=None`` means no limit and
+        ``expires_at=None`` never. A
         large coupon (50% off or more, no limit, or more than 1,000 uses)
         needs the owner's approval; the server answers so. Needs
         ``coupons:write``.
@@ -770,6 +777,7 @@ class AsyncCoupons(_AsyncResource):
                 "max_uses": max_uses,
                 "per_user_max_uses": per_user_max_uses,
                 "expires_at": expires_at,
+                **({} if active else {"active": False}),  # only when false: older stores refuse it
             },
             idempotency_key=idempotency_key,
         )

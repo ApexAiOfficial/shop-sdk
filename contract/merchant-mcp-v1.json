@@ -1,5 +1,5 @@
 {
-  "api_revision": "2026-11-05",
+  "api_revision": "2026-11-16",
   "path": "/api/merchant/v1/mcp",
   "protocol_versions": [
     "2025-11-25",
@@ -3619,10 +3619,13 @@
         "readOnlyHint": false,
         "title": "Create category"
       },
-      "description": "Create a catalog category, shown in the store, at the end of the category list.",
+      "description": "Create a catalog category at the end of the category list, shown in the store unless active is false (then hidden until update_category shows it).",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "active": {
+            "type": "boolean"
+          },
           "title": {
             "maxLength": 200,
             "minLength": 1,
@@ -6117,10 +6120,13 @@
         "readOnlyHint": false,
         "title": "Create coupon"
       },
-      "description": "Create an active coupon (the code is upper-cased); 50% off or more, or more than 1,000 or unlimited uses, needs the owner's approval.",
+      "description": "Create a coupon (the code is upper-cased), active unless active is false (then switched off until update_coupon switches it on); 50% off or more, or more than 1,000 or unlimited uses, needs the owner's approval.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "active": {
+            "type": "boolean"
+          },
           "code": {
             "maxLength": 32,
             "minLength": 1,

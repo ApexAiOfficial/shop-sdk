@@ -13,7 +13,7 @@ from apexai_shop import AsyncShop, Shop
 
 BASE_URL = "https://your-store.example/api/merchant/v1/"
 #: The contract revision the bundled copies carry.
-API_REVISION = "2026-11-05"
+API_REVISION = "2026-11-16"
 TOKEN = "shp_test_SECRET_token_value_123"
 CONTRACT_PATH = Path(__file__).resolve().parent.parent / "contract" / "merchant-api-v1.json"
 

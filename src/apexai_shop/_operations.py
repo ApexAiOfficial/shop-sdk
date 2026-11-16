@@ -71,7 +71,7 @@ OPERATIONS: Dict[str, Operation] = {
         body=("add_item_id", "remove_item_id"),
         uses_idempotency_key=True,
     ),
-    "create_category": Operation("POST", "/categories", body=("title",), uses_idempotency_key=True),
+    "create_category": Operation("POST", "/categories", body=("title", "active"), uses_idempotency_key=True),
     "update_category": Operation(
         "PATCH", "/categories/{category_id}", body=("title", "active"), uses_idempotency_key=True
     ),
@@ -129,7 +129,7 @@ OPERATIONS: Dict[str, Operation] = {
     "create_coupon": Operation(
         "POST",
         "/coupons",
-        body=("code", "pct_off", "max_uses", "per_user_max_uses", "expires_at"),
+        body=("code", "pct_off", "max_uses", "per_user_max_uses", "expires_at", "active"),
         uses_idempotency_key=True,
     ),
     "update_coupon": Operation(
